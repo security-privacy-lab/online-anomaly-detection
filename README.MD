@@ -1,0 +1,2 @@
+# DGN Graph Creation
+This repo attempts to recreate the graph creation from the paper [DGNN: Accurate Darknet Application Classification Adopting Attention Graph Neural Network](https://ieeexplore.ieee.org/document/10365685).
