@@ -5,21 +5,24 @@ from torch_geometric.data import Data
 from torch_geometric.utils import from_networkx
 import networkx as nx
 
+# We first import the dataset into the code, specifically by using a pandas dataframe.
 df = pandas.read_csv("Darknet.CSV")
-# We first properly convert the timestamps to panda's native format.
+# Once that's done, we convert the timestamp format to something that can be better used by pandas.
 df["Timestamp"] = pandas.to_datetime(df["Timestamp"], format="%d/%m/%Y %I:%M:%S %p")
-# Then create a rounded to the minute field for use later.
+# Then create a rounded to the minute field for grouping later.
 df["timestamp_minute"] = df["Timestamp"].dt.floor("min")
 # we sort the dataframe by timestamp earliest to latest...
 df = df.sort_values(by=["Timestamp"])
 # and group the entries by minute...
 grouped = df.groupby('timestamp_minute')
-
+# We then grab the group length for progress tracking, but this is an optional step that can be removed.
 total_groups = len(grouped)
 progress_counter = 0
+# We then create an array for the graphs...
 pyg_graphs = []
+# And now, for every minute in the dataset, we run the graph creation code.
 for timestamp_minute, group in grouped:
-    # For testing, nodes will be named by their index.
+    # For testing, nodes will be named by their index, but you may want to use flow id instead.
     index = 0
     # Then, we create the graph.
     G = nx.DiGraph()
@@ -29,10 +32,10 @@ for timestamp_minute, group in grouped:
     previous_backward_node = None
     # Now, for each entry...
     for idx, row in group.iterrows():
-        # Record the source and destination IP, as well as the flow ID
+        # Record the source and destination IP, as well as the flow ID.
         src_ip = row['Src IP']
         dst_ip = row['Dst IP']
-        flow_id = row['Flow ID']
+        flow_id = row['Flow ID'] # Currently, this isn't being used, but again, you may want to use this for indexing?
         
         # Initialize node features dictionary with common attributes for both forward and backward nodes
         node_features = {
@@ -43,6 +46,8 @@ for timestamp_minute, group in grouped:
         }
         
         # Update the dictionary with specific attributes for the forward node
+        # Another thing to note is that for pytorch-geo use, you need the features to share the same attributes, so the names are now shared, although the values
+        # are being pulled from different places for forwards and backwards nodes.
         forward_features = {
             'total_pkts': row['Total Fwd Packet'],
             'pkts_per_s': row['Fwd Packets/s'],
@@ -88,8 +93,9 @@ for timestamp_minute, group in grouped:
         G.add_node(backward_node_id, **node_features)
         nodes_list.append(backward_node_id)
         
-        # Connect the edges as appropriate
+        # Connect the edges as appropriate (in this case, chronological order, as we are dealing with network traffic.)
         G.add_edge(forward_node_id, backward_node_id)
+        # we then connect the previous backwards node to the next forward node, although we may need to change this in the future.
         if previous_backward_node is not None:
             G.add_edge(previous_backward_node, forward_node_id)
         
@@ -101,6 +107,7 @@ for timestamp_minute, group in grouped:
 
         # Append the PyG Data object to the list
         pyg_graphs.append(data)
+    # All of the following code is optional and only exists to be able to track the progress of the program.
     # Increment progress counter
     progress_counter += 1
 
