@@ -1,3 +1,1 @@
-[submodule "Baseline_models/GraphSAGE"]
-	path = Baseline_models/GraphSAGE
-	url = https://github.com/security-privacy-lab/DGN-Graph.git
+
