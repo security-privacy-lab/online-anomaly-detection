@@ -10,7 +10,8 @@ import json
 
 if __name__ == '__main__':
     # We first import the dataset into the code, specifically by using a pandas dataframe.
-    df = pandas.read_csv("graph_creation/data/Darknet.CSV")
+    df = pandas.read_csv(
+        "graph_creation/data/Darknet.CSV")
     # Once that's done, we convert the timestamp format to something that can be better used by pandas.
     df["Timestamp"] = pandas.to_datetime(
         df["Timestamp"], format="%d/%m/%Y %I:%M:%S %p")
@@ -95,12 +96,12 @@ if __name__ == '__main__':
                 row["Average Packet Size"],
                 row["Subflow Fwd Bytes"],
                 1,
-            ], "val": val, "label": label, "ip": src_ip}
+            ], "val": val, "label": label, "ip": src_ip, "flow_id": flow_id}
 
             node_features.update(forward_features)
 
             # Add the forward node to the graph
-            forward_node_id = str(flow_id) + "fwd"
+            forward_node_id = index
             G.add_node(forward_node_id, **node_features)
             nodes_list.append(forward_node_id)
 
@@ -133,12 +134,12 @@ if __name__ == '__main__':
                 -row["Average Packet Size"],
                 -row["Subflow Bwd Bytes"],
                 - 1,
-            ], "val": val, "label": label, "ip": dst_ip}
+            ], "val": val, "label": label, "ip": dst_ip, "flow_id": flow_id}
 
             node_features.update(backward_features)
 
             # Add the backward node to the graph
-            backward_node_id = str(flow_id) + "bwd"
+            backward_node_id = index
             G.add_node(backward_node_id, **node_features)
             nodes_list.append(backward_node_id)
 

@@ -1,7 +1,8 @@
 import json
 
 if __name__ == "__main__":
-    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
+    graph_lst = json.load(
+        open("graph_creation/processed_data/pygraphs.json"))
     # Initialize counter and dict to keep track of the largest graph
     num_nodes = 0
     max_graph = {}
@@ -13,7 +14,7 @@ if __name__ == "__main__":
             max_graph = graph
 
     # Dump the graph into a JSON file
-    with open("max_pygraphs.json", "w+") as f:
+    with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
         json.dump(max_graph, f)
 
     # Initialize the dict for id_map and class_map needed for graphSAGE
