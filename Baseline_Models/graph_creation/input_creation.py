@@ -2,10 +2,8 @@ import json
 import argparse
 import networkx as nx
 import os
-import random
 from networkx.readwrite import json_graph
 from pathlib import Path
-from collections import defaultdict
 
 MODELS = ["gin", "graphsage"]
 K = 10
@@ -35,14 +33,16 @@ def maxgraph():
     with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
         json.dump(max_graph, f)
 
+
+def graphsage():
+
+    maxgraph()
+
     # Initialize the dict for id_map and class_map needed for graphSAGE
     id_map = {}
     class_map = {}
 
     index = 0
-
-
-def graphsage():
     # Loop through all nodes and populate the id_map and class_map
     for node in max_graph["nodes"]:
         id_map[node["id"]] = index
@@ -100,18 +100,6 @@ def gin():
 
     if not os.path.exists(directory):
         os.makedirs(directory)
-
-    # final_data = dict()
-    # for fold_primary in range(K):
-    #     str_content = ""
-    #     num_nodes = 0
-    #     for fold_secondary in range(K):
-    #         if fold_primary != fold_secondary:
-    #             str_content += folds[fold_secondary][0]
-    #             num_nodes += folds[fold_secondary][1]
-    #     str_content = str(num_nodes) + "\n" + str_content
-    #     final_data[fold_primary] = {
-    #         "train": str_content, "test": folds[fold_primary][0]}
 
     with open(directory/"data.txt", 'w+') as f:
         f.write(file)
