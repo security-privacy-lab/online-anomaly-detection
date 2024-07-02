@@ -1,6 +1,7 @@
 import json
 import argparse
 import networkx as nx
+import numpy as np
 import os
 from networkx.readwrite import json_graph
 from pathlib import Path
@@ -66,8 +67,27 @@ def gin():
         data = json.load(f)
 
     nx_graphs = []
+
+    init_node_features = nx.get_node_attributes(
+        json_graph.node_link_graph(data["graphs"][0]), "features")[0]
+
+    max_vector = np.abs(np.array(init_node_features))
+    min_vector = np.abs(np.array(init_node_features))
+
     for graph in data["graphs"]:
-        nx_graphs.append(json_graph.node_link_graph(graph))
+        nx_graph = json_graph.node_link_graph(graph)
+        nx_graphs.append(nx_graph)
+
+        features = nx.get_node_attributes(nx_graph, "features")
+
+        for node in nx_graph.nodes:
+            max_vector = np.maximum(
+                max_vector, np.abs(np.array(features[node])))
+            min_vector = np.minimum(
+                min_vector, np.abs(np.array(features[node])))
+
+    max_vector = max_vector[:-1]
+    min_vector = min_vector[:-1]
 
     num_graphs = len(nx_graphs)
 
@@ -93,7 +113,10 @@ def gin():
         # Now adding the information of each node
         for node in graph.nodes:
             neighbors = list(nx.all_neighbors(graph, node))
-            node_features = features[node]
+            node_features = np.array(features[node])[:-1]
+            direction = -1 if np.any(node_features < 0) else 1
+            node_features = direction * \
+                (np.abs(node_features) - min_vector) / (max_vector - min_vector)
             file += f"{node} {len(neighbors)} {' '.join([str(n) for n in neighbors])} {' '.join([str(f) for f in node_features])}\n"
 
     directory = Path(__file__).parent / "processed_data" / "gin_data"
