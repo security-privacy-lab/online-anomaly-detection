@@ -38,7 +38,8 @@ def maxgraph():
 def graphsage():
 
     maxgraph()
-
+    max_graph = json.load(
+        open("graph_creation/processed_data/max_pygraphs-G.json", "r"))
     # Initialize the dict for id_map and class_map needed for graphSAGE
     id_map = {}
     class_map = {}
