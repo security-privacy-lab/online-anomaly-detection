@@ -35,22 +35,32 @@ def maxgraph():
         json.dump(max_graph, f)
 
 def maxgraphs():
-    graph_lst = json.load(
-        open("graph_creation/processed_data/pygraphs.json"))
+    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
     
     sorted_graphs = sorted(graph_lst["graphs"], key=lambda x: len(x["nodes"]), reverse=True)
     print("There are " + str(len(sorted_graphs)) + " graphs in the dataset")
+    
     top_graphs = sorted_graphs[:625]
 
     merged_graph = {
         "nodes": [],
-        "edges": []
+        "links": []  # Adjusted to use "links" instead of "edges"
     }
     
+    # Merge nodes and links from top graphs
     for graph in top_graphs:
-        merged_graph["nodes"] = list({node["id"]: node for node in merged_graph["nodes"]}.values())
-        merged_graph["nodes"] = list({edge["source"]: edge for edge in merged_graph["edges"]}.values())
+        merged_graph["nodes"].extend(graph["nodes"])
+        if "links" in graph:  # Adjusted to check for "links" instead of "edges"
+            merged_graph["links"].extend(graph["links"])  # Adjusted to use "links" instead of "edges"
+    
+    # Remove duplicate nodes
+    merged_graph["nodes"] = list({node["id"]: node for node in merged_graph["nodes"]}.values())
+    
+    # Remove duplicate links and validate nodes
+    node_ids = {node['id'] for node in merged_graph["nodes"]}
+    merged_graph["links"] = list({(link['source'], link['target']): link for link in merged_graph["links"] if link['source'] in node_ids and link['target'] in node_ids}.values())
 
+    # Dump the merged graph into a JSON file
     with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
         json.dump(merged_graph, f)
 
@@ -59,6 +69,8 @@ def graphsage():
     # maxgraph()
     max_graphs = json.load(
         open("graph_creation/processed_data/max_pygraphs-G.json", "r"))
+    # max_graph = json.load(
+    #     open("graph_creation/processed_data/max_pygraphs-G.json", "r"))
     # Initialize the dict for id_map and class_map needed for graphSAGE
     id_map = {}
     class_map = {}
