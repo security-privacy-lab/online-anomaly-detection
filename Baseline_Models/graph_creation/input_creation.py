@@ -34,11 +34,30 @@ def maxgraph():
     with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
         json.dump(max_graph, f)
 
+def maxgraphs():
+    graph_lst = json.load(
+        open("graph_creation/processed_data/pygraphs.json"))
+    
+    sorted_graphs = sorted(graph_lst["graphs"], key=lambda x: len(x["nodes"]), reverse=True)
+    print("There are " + str(len(sorted_graphs)) + " graphs in the dataset")
+    top_graphs = sorted_graphs[:625]
+
+    merged_graph = {
+        "nodes": [],
+        "edges": []
+    }
+    
+    for graph in top_graphs:
+        merged_graph["nodes"] = list({node["id"]: node for node in merged_graph["nodes"]}.values())
+        merged_graph["nodes"] = list({edge["source"]: edge for edge in merged_graph["edges"]}.values())
+
+    with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
+        json.dump(merged_graph, f)
 
 def graphsage():
-
-    maxgraph()
-    max_graph = json.load(
+    maxgraphs()
+    # maxgraph()
+    max_graphs = json.load(
         open("graph_creation/processed_data/max_pygraphs-G.json", "r"))
     # Initialize the dict for id_map and class_map needed for graphSAGE
     id_map = {}
@@ -46,7 +65,7 @@ def graphsage():
 
     index = 0
     # Loop through all nodes and populate the id_map and class_map
-    for node in max_graph["nodes"]:
+    for node in max_graphs["nodes"]:
         id_map[node["id"]] = index
         class_map[node["id"]] = node["label"]
         index += 1
