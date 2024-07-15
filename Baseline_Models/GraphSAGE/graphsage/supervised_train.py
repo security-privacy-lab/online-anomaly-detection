@@ -119,6 +119,11 @@ def construct_placeholders(num_classes):
     }
     return placeholders
 
+def save_model(sess, saver):
+    save_path = os.path.join(os.getcwd(), "model.ckpt")
+    saver.save(sess, save_path)
+    print("Model saved in path: %s" % save_path)
+
 def train(train_data, test_data=None):
 
     G = train_data[0]
@@ -250,6 +255,8 @@ def train(train_data, test_data=None):
      
     # Init variables
     sess.run(tf.global_variables_initializer(), feed_dict={adj_info_ph: minibatch.adj})
+
+    saver = tf.train.Saver()
     
     # Train model
     
@@ -328,12 +335,15 @@ def train(train_data, test_data=None):
     with open(log_dir() + "test_stats.txt", "w") as fp:
         fp.write("loss={:.5f} f1_micro={:.5f} f1_macro={:.5f}".
                 format(val_cost, val_f1_mic, val_f1_mac))
+        
+    save_model(sess, saver)
 
 def main(argv=None):
     print("Loading training data..")
     train_data = load_data(FLAGS.train_prefix)
     print("Done loading training data..")
     train(train_data)
+
 
 if __name__ == '__main__':
     tf.app.run()
