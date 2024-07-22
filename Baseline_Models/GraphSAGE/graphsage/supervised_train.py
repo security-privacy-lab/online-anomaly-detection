@@ -1,3 +1,20 @@
+# python -m graphsage.supervised_train \
+    # --train_prefix ./graph/max_pygraphs \
+    # --model graphsage_mean \
+    # --learning_rate 0.001 \
+    # --epochs 10 \
+    # --dropout 0.5 \
+    # --weight_decay 0.0005 \
+    # --max_degree 128 \
+    # --samples_1 25 \
+    # --samples_2 10 \
+    # --samples_3 0 \
+    # --dim_1 128 \
+    # --dim_2 128 \
+    # --batch_size 512 \
+    # --identity_dim 16 \
+    # --verbose
+
 from __future__ import division
 from __future__ import print_function
 
@@ -13,6 +30,8 @@ from graphsage.models import SAGEInfo
 from graphsage.minibatch import NodeMinibatchIterator
 from graphsage.neigh_samplers import UniformNeighborSampler
 from graphsage.utils import load_data
+
+from sklearn import metrics
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 
@@ -70,13 +89,36 @@ def calc_f1(y_true, y_pred):
     return metrics.f1_score(y_true, y_pred, average="micro"), metrics.f1_score(y_true, y_pred, average="macro")
 
 # Define model evaluation function
-def evaluate(sess, model, minibatch_iter, size=None):
+# def evaluate(sess, model, minibatch_iter, size=None):
+#     t_test = time.time()
+#     feed_dict_val, labels = minibatch_iter.node_val_feed_dict(size)
+#     node_outs_val = sess.run([model.preds, model.loss], 
+#                         feed_dict=feed_dict_val)
+#     mic, mac = calc_f1(labels, node_outs_val[0])
+
+#     if node_outs_val[0].shape[1] == 2:
+#         auc = roc_auc_score(labels, node_outds_val[0][:, 1])
+#     else:
+#         auc = roc_auc_score(labels, node_outs_val[0], multi_class='ovr')
+#     return node_outs_val[1], mic, mac, auc, (time.time() - t_test)
+
+def evaluate(sess, model, minibatch, size=None):
     t_test = time.time()
-    feed_dict_val, labels = minibatch_iter.node_val_feed_dict(size)
-    node_outs_val = sess.run([model.preds, model.loss], 
-                        feed_dict=feed_dict_val)
-    mic, mac = calc_f1(labels, node_outs_val[0])
-    return node_outs_val[1], mic, mac, (time.time() - t_test)
+    feed_dict_val, labels_val = minibatch.next_minibatch_feed_dict()
+    outs_val = sess.run([model.loss, model.preds], feed_dict=feed_dict_val)
+    cost = outs_val[0]
+    predictions = outs_val[1]
+
+    # Calculate F1 scores
+    f1_mic, f1_mac = calc_f1(labels_val, predictions)
+
+    # Calculate AUC
+    auc = metrics.roc_auc_score(labels_val, predictions)
+
+    return cost, f1_mic, f1_mac, auc, (time.time() - t_test)
+
+
+
 
 def log_dir():
     log_dir = FLAGS.base_log_dir + "/sup-" + FLAGS.train_prefix.split("/")[-2]
@@ -118,6 +160,11 @@ def construct_placeholders(num_classes):
         'batch_size' : tf.placeholder(tf.int32, name='batch_size'),
     }
     return placeholders
+
+def save_model(sess, saver):
+    save_path = os.path.join(os.getcwd(), "model.ckpt")
+    saver.save(sess, save_path)
+    print("Model saved in path: %s" % save_path)
 
 def train(train_data, test_data=None):
 
@@ -250,6 +297,8 @@ def train(train_data, test_data=None):
      
     # Init variables
     sess.run(tf.global_variables_initializer(), feed_dict={adj_info_ph: minibatch.adj})
+
+    saver = tf.train.Saver()
     
     # Train model
     
@@ -279,9 +328,9 @@ def train(train_data, test_data=None):
                 # Validation
                 sess.run(val_adj_info.op)
                 if FLAGS.validate_batch_size == -1:
-                    val_cost, val_f1_mic, val_f1_mac, duration = incremental_evaluate(sess, model, minibatch, FLAGS.batch_size)
+                    val_cost, val_f1_mic, val_f1_mac, val_auc, duration = incremental_evaluate(sess, model, minibatch, FLAGS.batch_size)
                 else:
-                    val_cost, val_f1_mic, val_f1_mac, duration = evaluate(sess, model, minibatch, FLAGS.validate_batch_size)
+                    val_cost, val_f1_mic, val_f1_mac, val_auc, duration = evaluate(sess, model, minibatch, FLAGS.validate_batch_size)
                 sess.run(train_adj_info.op)
                 epoch_val_costs[-1] += val_cost
 
@@ -299,7 +348,8 @@ def train(train_data, test_data=None):
                       "train_f1_mac=", "{:.5f}".format(train_f1_mac), 
                       "val_loss=", "{:.5f}".format(val_cost),
                       "val_f1_mic=", "{:.5f}".format(val_f1_mic), 
-                      "val_f1_mac=", "{:.5f}".format(val_f1_mac), 
+                      "val_f1_mac=", "{:.5f}".format(val_f1_mac),
+                      "val_auc=", "{:.5f}".format(val_auc),
                       "time=", "{:.5f}".format(avg_time))
  
             iter += 1
@@ -318,22 +368,26 @@ def train(train_data, test_data=None):
                   "loss=", "{:.5f}".format(val_cost),
                   "f1_micro=", "{:.5f}".format(val_f1_mic),
                   "f1_macro=", "{:.5f}".format(val_f1_mac),
+                  "auc=", "{:.5f}".format(val_auc),
                   "time=", "{:.5f}".format(duration))
     with open(log_dir() + "val_stats.txt", "w") as fp:
-        fp.write("loss={:.5f} f1_micro={:.5f} f1_macro={:.5f} time={:.5f}".
-                format(val_cost, val_f1_mic, val_f1_mac, duration))
+        fp.write("loss={:.5f} f1_micro={:.5f} f1_macro={:.5f} auc={:.5f} time={:.5f}".
+                format(val_cost, val_f1_mic, val_f1_mac, val_auc, duration))
 
     print("Writing test set stats to file (don't peak!)")
     val_cost, val_f1_mic, val_f1_mac, duration = incremental_evaluate(sess, model, minibatch, FLAGS.batch_size, test=True)
     with open(log_dir() + "test_stats.txt", "w") as fp:
-        fp.write("loss={:.5f} f1_micro={:.5f} f1_macro={:.5f}".
-                format(val_cost, val_f1_mic, val_f1_mac))
+        fp.write("loss={:.5f} f1_micro={:.5f} f1_macro={:.5f} auc={:.5f}".
+                format(val_cost, val_f1_mic, val_f1_mac, val_auc))
+        
+    save_model(sess, saver)
 
 def main(argv=None):
     print("Loading training data..")
     train_data = load_data(FLAGS.train_prefix)
     print("Done loading training data..")
     train(train_data)
+
 
 if __name__ == '__main__':
     tf.app.run()

@@ -18,8 +18,7 @@ def process_data(models):
 
 
 def maxgraph():
-    graph_lst = json.load(
-        open("graph_creation/processed_data/pygraphs.json"))
+    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
     # Initialize counter and dict to keep track of the largest graph
     num_nodes = 0
     max_graph = {}
@@ -37,22 +36,87 @@ def maxgraph():
     return max_graph
 
 
-def graphsage():
+def maxgraphs():
+    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
+
+    sorted_graphs = sorted(
+        graph_lst["graphs"], key=lambda x: len(x["nodes"]), reverse=True
+    )
+    print("There are " + str(len(sorted_graphs)) + " graphs in the dataset")
+
+    top_graphs = sorted_graphs[:625]
+
 
     max_graph = maxgraph()
+    merged_graph = {
+        "nodes": [],
+        "links": [],
+    }
+    for graph in top_graphs:
+        merged_graph["nodes"].extend(graph["nodes"])
+        if "links" in graph:
+            merged_graph["links"].extend(graph["links"])
 
-    # Initialize the dict for id_map and class_map needed for graphSAGE
+    merged_graph["nodes"] = list(
+        {node["id"]: node for node in merged_graph["nodes"]}.values()
+    )
+
+    node_ids = {node["id"] for node in merged_graph["nodes"]}
+    merged_graph["links"] = list(
+        {
+            (link["source"], link["target"]): link
+            for link in merged_graph["links"]
+            if link["source"] in node_ids and link["target"] in node_ids
+        }.values()
+    )
+
+    with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
+        json.dump(merged_graph, f)
+
+
+def allgraphs():
+    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
+    graphs = sorted(graph_lst["graphs"], key=lambda x: len(x["nodes"]), reverse=True)
+    merged_graph = {
+        "nodes": [],
+        "links": [],
+    }
+
+    for graph in graphs:
+        merged_graph["nodes"].extend(graph["nodes"])
+        if "links" in graph:
+            merged_graph["links"].extend(graph["links"])
+
+    merged_graph["nodes"] = list(
+        {node["id"]: node for node in merged_graph["nodes"]}.values()
+    )
+
+    node_ids = {node["id"] for node in merged_graph["nodes"]}
+    merged_graph["links"] = list(
+        {
+            (link["source"], link["target"]): link
+            for link in merged_graph["links"]
+            if link["source"] in node_ids and link["target"] in node_ids
+        }.values()
+    )
+    with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
+        json.dump(merged_graph, f)
+
+
+def graphsage():
+    allgraphs()
+    # maxgraphs()
+    # maxgraph()
+    graph = json.load(open("graph_creation/processed_data/max_pygraphs-G.json", "r"))
     id_map = {}
     class_map = {}
 
     index = 0
-    # Loop through all nodes and populate the id_map and class_map
-    for node in max_graph["nodes"]:
+    for node in graph["nodes"]:
         id_map[node["id"]] = index
         class_map[node["id"]] = node["label"]
         index += 1
 
-    # Dump id_map and class_map into JSON files
     with open("graph_creation/processed_data/max_pygraphs-id_map.json", "w+") as f:
         json.dump(id_map, f)
     with open("graph_creation/processed_data/max_pygraphs-class_map.json", "w+") as f:
@@ -71,7 +135,8 @@ def gin():
     nx_graphs = []
 
     init_node_features = nx.get_node_attributes(
-        json_graph.node_link_graph(data["graphs"][0]), "features")[0]
+        json_graph.node_link_graph(data["graphs"][0]), "features"
+    )[0]
 
     max_vector = np.abs(np.array(init_node_features))
     min_vector = np.abs(np.array(init_node_features))
@@ -83,10 +148,8 @@ def gin():
         features = nx.get_node_attributes(nx_graph, "features")
 
         for node in nx_graph.nodes:
-            max_vector = np.maximum(
-                max_vector, np.abs(np.array(features[node])))
-            min_vector = np.minimum(
-                min_vector, np.abs(np.array(features[node])))
+            max_vector = np.maximum(max_vector, np.abs(np.array(features[node])))
+            min_vector = np.minimum(min_vector, np.abs(np.array(features[node])))
 
     max_vector = max_vector[:-1]
     min_vector = min_vector[:-1]
@@ -106,8 +169,7 @@ def gin():
 
         labels = nx.get_node_attributes(graph, "label")
 
-        graph_label = 1 if any(
-            node_label == 1 for node_label in labels.values()) else 0
+        graph_label = 1 if any(node_label == 1 for node_label in labels.values()) else 0
 
         # Adding the graph metadata
         file += f"{num_nodes} {graph_label}\n"
@@ -117,8 +179,11 @@ def gin():
             neighbors = list(nx.all_neighbors(graph, node))
             node_features = np.array(features[node])[:-1]
             direction = -1 if np.any(node_features < 0) else 1
-            node_features = direction * \
-                (np.abs(node_features) - min_vector) / (max_vector - min_vector)
+            node_features = (
+                direction
+                * (np.abs(node_features) - min_vector)
+                / (max_vector - min_vector)
+            )
             file += f"{node} {len(neighbors)} {' '.join([str(n) for n in neighbors])} {' '.join([str(f) for f in node_features])}\n"
 
     directory = Path(__file__).parent / "processed_data" / "gin_data"
@@ -126,14 +191,14 @@ def gin():
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    with open(directory/"data.txt", 'w+') as f:
+    with open(directory / "data.txt", "w+") as f:
         f.write(file)
 
-    gin_directory = Path(__file__).parent.parent/"GIN"/"dataset"/"DARKNET"
+    gin_directory = Path(__file__).parent.parent / "GIN" / "dataset" / "DARKNET"
     if not os.path.exists(gin_directory):
         os.makedirs(gin_directory)
 
-    with open(gin_directory/"DARKNET.txt", 'w+') as f:
+    with open(gin_directory / "DARKNET.txt", "w+") as f:
         f.write(file)
 
     print("Data for GIN successfully processed")
@@ -141,10 +206,16 @@ def gin():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Process the general NX Graph object (pygraphs.json) into various formats suitable to be ran by the various baseline models.')
+        description="Process the general NX Graph object (pygraphs.json) into various formats suitable to be ran by the various baseline models."
+    )
 
-    parser.add_argument('--models', choices=MODELS+["all", "maxgraph"], default='all',
-                        nargs='+', help="the model you need to generate data for [all, gin, graphsage, maxgraph].")
+    parser.add_argument(
+        "--models",
+        choices=MODELS + ["all", "maxgraph"],
+        default="all",
+        nargs="+",
+        help="the model you need to generate data for [all, gin, graphsage, maxgraph].",
+    )
     args = parser.parse_args()
     models = args.models
     process_data(models)

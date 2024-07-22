@@ -107,3 +107,4 @@ ENV/
 *.pickle
 *.pkl
 
+Baseline_Models/GraphSAGE/graph_creation/processed_data/**
