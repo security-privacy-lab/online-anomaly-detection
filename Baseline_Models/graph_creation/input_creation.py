@@ -6,7 +6,7 @@ import os
 from networkx.readwrite import json_graph
 from pathlib import Path
 
-MODELS = ["gin", "graphsage"]
+MODELS = ["gin", "graphsage", "gat"]
 K = 10
 
 
@@ -199,6 +199,50 @@ def gin():
 
     print("Data for GIN successfully processed")
 
+def gat():
+    print("Processing data for GAT...")
+    graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json", "r"))
+    graphs = sorted(graph_lst["graphs"], key=lambda x: len(x["nodes"]), reverse=True)
+    merged_graph = {
+        "nodes": [],
+        "links": [],
+    }
+
+    for graph in graphs:
+        merged_graph["nodes"].extend(graph["nodes"])
+        if "links" in graph:
+            merged_graph["links"].extend(graph["links"])
+    
+    merged_graph["nodes"] = list(
+        {node["id"]: node for node in merged_graph["nodes"]}.values()
+    )
+
+    node_ids = {node["id"] for node in merged_graph["nodes"]}
+    merged_graph["links"] = list(
+        {
+            (link["source"], link["target"]): link
+            for link in merged_graph["links"]
+            if link["source"] in node_ids and link["target"] in node_ids
+        }.values()
+    )
+
+    id_map = {}
+    class_map = {}
+
+    index = 0
+    for node in merged_graph["nodes"]:
+        id_map[node["id"]] = index
+        class_map[node["id"]] = node["label"]
+        index += 1
+    
+    with open("graph_creation/processed_data/gat_pygraphs.json", "w+") as f:
+        json.dump(merged_graph, f)
+    with open("graph_creation/processed_data/gat_id_map.json", "w+") as f:
+        json.dump(id_map, f)
+    with open("graph_creation/processed_data/gat_class_map.json", "w+") as f:
+        json.dump(class_map, f)
+
+    print("Data for GAT successfully processed")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
