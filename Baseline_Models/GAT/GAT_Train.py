@@ -1,8 +1,8 @@
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from GAT_Demo_Model import GAT
-from GAT_Demo_Data import prepare_data
+from GAT_Model import GAT
+# from GAT_Demo_Data import prepare_data
 
 def prepare_data():
     data = torch.load("graph_creation/processed_data/gat_data.pt")
