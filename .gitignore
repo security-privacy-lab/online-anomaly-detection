@@ -108,3 +108,4 @@ ENV/
 *.pkl
 
 Baseline_Models/GraphSAGE/graph_creation/processed_data/**
+snapshot_data/**
