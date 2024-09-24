@@ -87,7 +87,9 @@ def static_process(args):
 
 
     # conduct anomaly detection using first snapshot of testing edges
-    scores, auc, n0, c0, res, ab_score = anomaly_detection(embedding, train, synthetic_test[0:args.snap, :], k)
+    scores, auc, n0, c0, res, ab_score = anomaly_detection(embedding, train, synthetic_test[0:int(args.snap), :], k)
+    print(f"args.snap: {args.snap}, type: {type(args.snap)}")
+
 
     print('initial auc of anomaly detection:', auc)
     print('initial anomaly score:', ab_score)
@@ -145,7 +147,7 @@ def main():
     parser.add_argument('--format', default='adjlist',
                         help='File format of input file')
 
-    parser.add_argument('--snap', default=100,
+    parser.add_argument('--snap', default=100, type=int,
                         help='number of edges in each snapshot')
 
     parser.add_argument('--init_percent', default=0.8,
