@@ -252,7 +252,7 @@ class NetWalk_update:
         self.data_path = path
         self.walk_len = walk_len
         self.init_percent = init_percent
-        self.snap = snap
+        self.snap = int(snap)
         self.vertices = None
         self.idx = 0
         self.walk_per_node = walk_per_node
