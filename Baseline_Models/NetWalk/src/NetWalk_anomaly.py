@@ -81,6 +81,10 @@ def static_process(args):
 
     # STEP 2: Learning initial embeddings for training edges
     embedding = getEmbedding(embModel, ini_data, n)
+    # Save the embeddings to the output file
+    with open(args.output, 'a') as f:  # 'a' to append after each snapshot
+        np.savetxt(f, embedding, delimiter=',')
+
 
     # dynaimically plot the anomaly score over different snapshots
     d_plot = DP.DynamicUpdate()
