@@ -163,16 +163,17 @@ class Model:
                 if self.optimizer_type == "lbfgs":
                     for i in range(len(batches)):
                         batch = batches[i]
-                        feed_dict = {self.data: batch, self.corrupt_prob: self.corrupt_prob_value}
+                        feed_dict = {self.data: batch.astype(np.int32), self.corrupt_prob: self.corrupt_prob_value}
                         self.optimizer.minimize(self.sess, loss_callback=self.print_loss,
                                             fetches=[self.loss, self.clique_loss, self.ae_loss, self.kl_loss,
                                                      self.self_weight_decay_J],
                                             feed_dict=feed_dict)
+                        
 
                 else:
                     for i in range(len(batches)):
                         batch = batches[i]
-                        feed_dict = {self.data: batch, self.corrupt_prob: self.corrupt_prob_value}
+                        feed_dict = {self.data: batch.astype(np.int32), self.corrupt_prob: self.corrupt_prob_value}
                         loss_bt, _ = self.sess.run([self.loss, self.optimizer], feed_dict=feed_dict)
                         cl, ae, kl, weight = self.sess.run(
                             [self.clique_loss, self.ae_loss, self.kl_loss, self.self_weight_decay_J],
