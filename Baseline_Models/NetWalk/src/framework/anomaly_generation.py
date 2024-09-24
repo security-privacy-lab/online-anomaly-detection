@@ -44,7 +44,7 @@ def anomaly_generation(ini_graph_percent, anomaly_percent, data, n, m):
 
     # ini_graph_percent = 0.5;
     # anomaly_percent = 0.05;
-    train_num = int(np.floor(ini_graph_percent * m))
+    train_num = int(np.floor(float(ini_graph_percent) * float(m)))
 
     # select part of edges as in the training set
     train = data[0:train_num, :]
