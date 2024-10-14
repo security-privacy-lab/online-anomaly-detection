@@ -1,37 +1,40 @@
 #include <vector>
+#include <algorithm>
+#include <numeric>
 #include <iostream>
 
-void compute_accuracy(double* as, bool* attack, int timeNum, int topN)
-{
-    int tp, fp, tn, fn;
-    tp = fp = tn = fn = 0;
-    std::vector<size_t> idx(timeNum);
+void compute_accuracy(double* as, bool* attack, int timeNum, int topN, double &precision, double &recall) {
+    std::vector<int> idx(timeNum);
     std::iota(idx.begin(), idx.end(), 0);
 
-    std::sort(idx.begin(), idx.end(), [&as](size_t i1, size_t i2) {return as[i1] > as[i2];});
+    // Sort indices based on anomaly scores
+    std::sort(idx.begin(), idx.end(), [as](int i1, int i2) {
+        return as[i1] > as[i2];
+    });
 
-    for(int i = 0; i < topN; i++)
-    {
-        if(attack[idx[i]])
-            tp++;
-        else
-            fp++;
-	}
+    int truePositives = 0;
+    int falsePositives = 0;
+    int actualAnomalies = 0;
 
-    for(int i = topN; i < timeNum; i++)
-    {
-        if(attack[idx[i]])
-            fn++;
-        else
-            tn++;
+    // Count actual anomalies in the data
+    for (int i = 0; i < timeNum; ++i) {
+        if (attack[i]) {
+            actualAnomalies++;
+        }
     }
 
-    double precision = double(tp)/(tp+fp);
-    double recall = double(tp)/(tp+fn);
-    double f1 = 2*precision*recall/(precision+recall);
-    double TPR = double(tp)/(tp+fn);
-    double FPR = double(fp)/(fp+tn);
+    // Calculate true positives and false positives for topN results
+    for (int i = 0; i < topN; ++i) {
+        if (attack[idx[i]]) {
+            truePositives++;
+        } else {
+            falsePositives++;
+        }
+    }
 
-    std::cout << "[TOP" << topN << "] precision: " << precision << ", recall: " << recall << std::endl;
+    precision = (topN > 0) ? static_cast<double>(truePositives) / topN : 0.0;
+    recall = (actualAnomalies > 0) ? static_cast<double>(truePositives) / actualAnomalies : 0.0;
+
+    // Commented out to prevent duplicate output:
+    // std::cout << "Top " << topN << " - Precision: " << precision << ", Recall: " << recall << std::endl;
 }
-
