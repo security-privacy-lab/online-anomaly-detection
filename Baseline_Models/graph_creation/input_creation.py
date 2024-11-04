@@ -33,6 +33,8 @@ def maxgraph():
     with open("graph_creation/processed_data/max_pygraphs-G.json", "w+") as f:
         json.dump(max_graph, f)
 
+    return max_graph
+
 
 def maxgraphs():
     graph_lst = json.load(open("graph_creation/processed_data/pygraphs.json"))
@@ -44,6 +46,8 @@ def maxgraphs():
 
     top_graphs = sorted_graphs[:625]
 
+
+    max_graph = maxgraph()
     merged_graph = {
         "nodes": [],
         "links": [],
