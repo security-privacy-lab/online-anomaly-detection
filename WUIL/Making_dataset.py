@@ -26,6 +26,9 @@ combined_malicious_logs = pd.concat([malicious_logs1, malicious_logs2, malicious
 
 # Step 3: Inject malicious logs
 choice = input("Are you trying to make Random injection or 5-minute block injection? \nAnswer with: rj (random injection) or 5m (5-minute injection): ")
+
+injected_dataset = dataset_benign.copy()
+
 if choice in ['rj', '5m']:
     if choice == 'rj':
         max_size = len(combined_malicious_logs)
@@ -35,16 +38,31 @@ if choice in ['rj', '5m']:
             exit()
         else:
             malicious_subset = combined_malicious_logs.sample(parameter, random_state=123)
+
     elif choice == '5m':
         dataset_benign['time_diff'] = dataset_benign['Session_ID'].diff()
         gaps = dataset_benign[dataset_benign['time_diff'] >= 3000].reset_index()
         if gaps.empty:
             print("No suitable 5-minute gaps found. Exiting.")
             exit()
-        malicious_subset = combined_malicious_logs.sample(len(gaps), random_state=123)
 
-    # Inject malicious logs
-    injected_dataset = dataset_benign.copy()
+        num_logs = int(input("How many attack logs do you want to insert? (1, 2, or 3): "))
+        for _ in range(num_logs):
+            print(f"\nAvailable gaps:\n{gaps[['Session_ID']].to_string(index=False)}")
+            gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
+            malicious_input = input("Choose a malicious log to inject (1, 2, or 3): ")
+            if malicious_input in ['1', '2', '3']:
+                malicious_log = pd.read_csv(f'Attack{malicious_input}_log.txt', sep='|', header=None, names=columns)
+                injected_dataset = pd.concat([
+                    injected_dataset.iloc[:gap_index],
+                    malicious_log,
+                    injected_dataset.iloc[gap_index:]
+                ]).reset_index(drop=True)
+            else:
+                print("Invalid malicious log choice!")
+                exit()
+
+    # Inject malicious rows randomly for `rj` or at gaps for `5m`
     for _, malicious_row in malicious_subset.iterrows():
         random_index = random.randint(0, len(injected_dataset))
         malicious_data = {
