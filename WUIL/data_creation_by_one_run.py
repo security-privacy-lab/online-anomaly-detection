@@ -23,13 +23,14 @@ def organized_version(dataset_benign):
     for _ in range(num_logs):
         malicious_file_name = input("Enter the malicious file name(Expecting the extension as '.txt' )")
         malicious_file = preprocess_malicious_dataset(malicious_file_name)
-        injected_dataset = pd.concat((injected_dataset, malicious_file),ignore_index= True)
-        injected_dataset = injected_dataset.sort_values(by="Session_ID", ascending=True)
-    return injected_dataset
+        dataset_benign = pd.concat((injected_dataset, malicious_file),ignore_index= True)
+        dataset_benign = dataset_benign.sort_values(by="Session_ID", ascending=True)
+    return dataset_benign
 
-def minute_5_gap(dataset_benign):
-    dataset_benign['time_diff'] = dataset_benign['Session_ID'].diff()
-    gaps = dataset_benign[dataset_benign['time_diff'] >= 300].reset_index()
+def minute_5_gap(injected_dataset):
+    
+    injected_dataset['time_diff'] = injected_dataset['Session_ID'].diff()
+    gaps = injected_dataset[injected_dataset['time_diff'] >= 300].reset_index()
     if gaps.empty:
         print("No suitable 5-minute gaps found. Exiting.")
         return None
@@ -104,6 +105,8 @@ if choice in ['rj', '5m', 'or']:
             injected_dataset = minute_5_gap(injected_dataset)
         print(f"Original Dataset Length : {len(dataset_benign)}")
         print(f'Current dataset length : {len(injected_dataset)}')
+    elif choice == 'or':
+        exit()
     else: 
         print("Invalid choice, exiting...")
         exit()
