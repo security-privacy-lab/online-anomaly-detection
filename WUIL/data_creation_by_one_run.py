@@ -4,11 +4,16 @@ import hashlib
 
 columns = ['ID', 'Date', 'Time', 'Session_ID', 'Depth', 'Path', 'Label']
 # Different saving methods
-def save_as_anomrank_or_f_fade(edges_df, title):
+def customize_saving_method(edges_df):
+    title = input("What is you desired title for the file?")
+    exit()
+def save_as_anomrank_or_f_fade(edges_df):
+    title = input("What is you desired title for the file?")
     edges_df[['timestamp','src_node', 'dst_node', 'label']].to_csv(
     f'{title}.txt', sep = ' ', header = False, index = False
     )
-def save_as_sedanspot(edges_df, title):
+def save_as_sedanspot(edges_df):
+    title = input("What is you desired title for the file?")
     edges_df[['timestamp','src_node', 'dst_node', 'weight', 'label']].to_csv(
     f'{title}.csv', sep = ',', header = False, index = False
     )
@@ -106,7 +111,11 @@ if choice in ['rj', '5m', 'or']:
         print(f"Original Dataset Length : {len(dataset_benign)}")
         print(f'Current dataset length : {len(injected_dataset)}')
     elif choice == 'or':
-        exit()
+        numbers_of_malicious_files_injected = input("How many malicious files do you want to inject?")
+        for _ in range(int(numbers_of_malicious_files_injected)):
+            injected_dataset = organized_version(injected_dataset)
+            print(f"Original Dataset Length : {len(dataset_benign)}")
+            print(f'Current dataset length : {len(injected_dataset)}')
     else: 
         print("Invalid choice, exiting...")
         exit()
@@ -145,8 +154,10 @@ for _, row in injected_dataset.iterrows():
 
 edges_df = pd.DataFrame(edges)
 
-file_type = input("1. Anomrank/F-Fade\n2. Sedanspot.")
+file_type = input("1. Anomrank/F-Fade\n2. Sedanspot. 3. Customize")
 if file_type == '1':
     save_as_anomrank_or_f_fade(edges_df)
 elif file_type == '2':
     save_as_sedanspot(edges_df)
+elif file_type == '3':
+    customize_saving_method(edges)
