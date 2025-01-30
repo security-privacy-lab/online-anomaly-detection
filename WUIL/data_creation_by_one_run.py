@@ -3,6 +3,26 @@ import random
 
 columns = ['ID', 'Date', 'Time', 'Session_ID', 'Depth', 'Path', 'Label']
 
+
+# Load the dataset
+def load_dataset():
+    while True: 
+        try:
+            title = input("Enter the dataset file name (without extension): ")
+            dataset_loaded = pd.read_csv(f"{title}.txt", sep='|', header=None, names = columns)
+            print(f"The loaded file | Name : {title}.txt | Size : {len(dataset_loaded)}")
+            break
+        except FileNotFoundError:
+            print("The file has not been found. Please try again")
+    
+    return dataset_loaded
+
+# Preprocess the malicious dataset
+def preprocess_malicious_dataset():
+    dataset = load_dataset()
+    dataset['Label'] = 1
+    return dataset
+
 def customize_saving_method(edges_df):
     """Allows the user to customize saving columns."""
     new_columns = []
@@ -19,21 +39,12 @@ def customize_saving_method(edges_df):
             print("Invalid column. Please try again.")
     
     if new_columns:
-        edges_df[new_columns].to_csv(f"{title}.csv", sep=',', index=False)
+        separator_type = input("What is your preferred separator?")
+        file_type = input("What do you want your file formatting to be?")
+        edges_df[new_columns].to_csv(f"{title}.{file_type}", sep=f'{separator_type}', index=False)
+        print("Successfully created the dataset! Exiting...")
     else:
         print("No columns selected. Exiting.")
-    
-
-def load_dataset():
-    
-    while True: 
-        try:
-            title = input("Enter the dataset file name (without extension): ")
-            dataset_benign = pd.read_csv(f"{title}.txt", sep='|', header=None, names = columns)
-            break
-        except FileNotFoundError:
-            print("The file has not been found. Please try again")
-    return dataset_benign
     
 
 def save_as_anomrank_or_f_fade(edges_df):
@@ -50,24 +61,14 @@ def save_as_sedanspot(edges_df):
         f'{title}.csv', sep=',', header=False, index=False
     )
 
-def preprocess_malicious_dataset(filename):
-    """Preprocesses a malicious dataset from a text file."""
-    dataset = load_dataset()
-    dataset.drop(["Date", "Time"], axis=1, inplace=True)
-    dataset['Label'] = 1
-    return dataset
 
 def organized_version(dataset_benign, num_logs):
     """Organizes malicious logs into the dataset in order."""
-    for _ in range(num_logs):
-        malicious_file_name = input("Enter the malicious file name (without extension): ")
-        
-        malicious_file = preprocess_malicious_dataset(malicious_file_name)
+    for _ in range(int(num_logs)):
+        malicious_file = preprocess_malicious_dataset()
         dataset_benign = pd.concat((dataset_benign, malicious_file), ignore_index=True)
         dataset_benign = dataset_benign.sort_values(by="Session_ID", ascending=True)
     return dataset_benign
-
-import pandas as pd
 
 def minute_5_gap(injected_dataset, num_logs):
     """Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly."""
@@ -84,16 +85,13 @@ def minute_5_gap(injected_dataset, num_logs):
     for i in range(0, len(gap_indexes), 5):
         print("   ".join(f"{idx:>5}" for idx in gap_indexes[i:i+5])) 
 
-    for _ in range(num_logs):
+    for _ in range(int(num_logs)):
         try: 
             gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
             if gap_index not in gap_indexes:
                 print("Invalid index. Please select from the printed list.")
                 continue
-
-            malicious_file_name = load_dataset()
-            malicious_file = preprocess_malicious_dataset(malicious_file_name)
-
+            malicious_file = preprocess_malicious_dataset()
             injected_dataset = pd.concat([
                 injected_dataset.iloc[:gap_index+1],
                 malicious_file,
@@ -107,29 +105,29 @@ def minute_5_gap(injected_dataset, num_logs):
     return injected_dataset
 
 
-def random_injection(injected_dataset, num_logs):
+def random_injection(injected_dataset, num_log):
     """Injects malicious logs randomly into the dataset."""
-    malicious_file_name = input("Enter the malicious file name (without extension): ")
-    malicious_file = preprocess_malicious_dataset(malicious_file_name)
-    injected_indices = []
-    
-    for _, malicious_row in malicious_file.iterrows():
-        malicious_data = {
-            'Session_ID': malicious_row['Session_ID'],
-            'Depth': malicious_row['Depth'],
-            'Path': malicious_row['Path'],
-            'Label': malicious_row['Label']
-        }
-        malicious_row_df = pd.DataFrame([malicious_data])
+    for _ in range(int(num_log)):
+        malicious_file = preprocess_malicious_dataset()
+        injected_indices = []
+        
+        for _, malicious_row in malicious_file.iterrows():
+            malicious_data = {
+                'Session_ID': malicious_row['Session_ID'],
+                'Depth': malicious_row['Depth'],
+                'Path': malicious_row['Path'],
+                'Label': malicious_row['Label']
+            }
+            malicious_row_df = pd.DataFrame([malicious_data])
 
-        random_index = random.randint(0, len(injected_dataset)) 
-        injected_indices.append(random_index)
-        injected_dataset = pd.concat([
-            injected_dataset.iloc[:random_index],  
-            malicious_row_df,                      
-            injected_dataset.iloc[random_index:]  
-        ]).reset_index(drop=True)
-    
+            random_index = random.randint(0, len(injected_dataset)) 
+            injected_indices.append(random_index)
+            injected_dataset = pd.concat([
+                injected_dataset.iloc[:random_index],  
+                malicious_row_df,                      
+                injected_dataset.iloc[random_index:]  
+            ]).reset_index(drop=True)
+        
     print("Malicious logs successfully injected at random indices.")
     return injected_dataset
 
@@ -140,9 +138,10 @@ dataset_benign = dataset_benign.sort_values(by='Session_ID').reset_index(drop=Tr
 dataset_benign['Label'] = 0
 injected_dataset = dataset_benign.copy()
 choice = input("Choose injection method: rj (random), 5m (5-minute block), or or (organized): ")
-
+# Make choices
 if choice in ['rj', '5m', 'or']:
     num_logs = int(input("How many malicious files do you want to inject? "))
+    num_logs = int(num_logs)
     
     if choice == 'rj':
         injected_dataset = random_injection(injected_dataset, num_logs)
@@ -159,9 +158,9 @@ else:
     exit()
 
 
+# Make self-edging graph here
 edges = []
 prev_path = None
-
 for _, row in injected_dataset.iterrows():
     current_path = row['Path']
     timestamp = row['Session_ID']
