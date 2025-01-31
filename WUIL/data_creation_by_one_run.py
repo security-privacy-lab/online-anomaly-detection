@@ -72,10 +72,10 @@ def organized_version(dataset_benign, num_logs):
 
 def minute_5_gap(injected_dataset, num_logs):
     """Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly."""
-    
-    injected_dataset['time_diff'] = injected_dataset['Session_ID'].diff()
-    
-    gap_indexes = injected_dataset[injected_dataset['time_diff'] >= 300].index.tolist()
+    difference = pd.DataFrame([], columns= ["time_diff"])
+    difference['time_diff'] = injected_dataset['Session_ID'].astype(int).shift(-1) - injected_dataset['Session_ID'].astype(int)
+    gap_indexes = difference[difference['time_diff'] >= 301].index.tolist()
+
     
     if not gap_indexes:
         print("No suitable 5-minute gaps found. Exiting.")
