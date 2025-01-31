@@ -1,5 +1,6 @@
 import pandas as pd
 import random
+import hashlib
 
 columns = ['ID', 'Date', 'Time', 'Session_ID', 'Depth', 'Path', 'Label']
 
@@ -47,7 +48,71 @@ def customize_saving_method(edges_df):
         print("No columns selected. Exiting.")
     
 
-def save_as_anomrank_or_f_fade(edges_df):
+def save_as_MAD(injected_data):
+    edges = []
+    prev_path = None
+
+    for _, row in injected_dataset.iterrows():
+        current_path = row['Path']
+        timestamp = row['Session_ID']
+        label = row['Label']
+        current_path_hashed = int(hashlib.md5(current_path.encode()).hexdigest(), 16) % (10**8)
+
+        # Self-edge
+        if prev_path == current_path:
+            edges.append({
+                'src_node' : current_path_hashed,
+                'dst_node': current_path_hashed,
+                'timestamp' : timestamp,
+                'label' : label
+                
+            })
+        elif prev_path is not None:
+            prev_path_hashed = int(hashlib.md5(prev_path.encode()).hexdigest(), 16) % (10**8)
+            edges.append({      
+                'src_node' : prev_path_hashed,
+                'dst_node': current_path_hashed,
+                'timestamp' : row['Session_ID'],
+                'label' : label
+            })
+        prev_path = current_path
+
+    edges_df = pd.DataFrame(edges)
+    title = input("Enter the desired file name: ")
+    edges_df[['timestamp', 'src_node', 'dst_node']].to_csv(
+        f'{title}.txt', sep=',', header=False, index=False
+    )
+
+def save_as_anomrank_or_f_fade(injected_dataset):
+    edges = []
+    prev_path = None
+
+    for _, row in injected_dataset.iterrows():
+        current_path = row['Path']
+        timestamp = row['Session_ID']
+        label = row['Label']
+        current_path_hashed = int(hashlib.md5(current_path.encode()).hexdigest(), 16) % (10**8)
+
+        # Self-edge
+        if prev_path == current_path:
+            edges.append({
+                'src_node' : current_path_hashed,
+                'dst_node': current_path_hashed,
+                'timestamp' : timestamp,
+                'label' : label
+                
+            })
+        elif prev_path is not None:
+            prev_path_hashed = int(hashlib.md5(prev_path.encode()).hexdigest(), 16) % (10**8)
+            edges.append({      
+                'src_node' : prev_path_hashed,
+                'dst_node': current_path_hashed,
+                'timestamp' : row['Session_ID'],
+                'label' : label
+            })
+        prev_path = current_path
+
+    edges_df = pd.DataFrame(edges)
     """Saves the dataset in AnomRank or F-Fade format."""
     title = input("Enter the desired file name: ")
     edges_df[['timestamp', 'src_node', 'dst_node', 'label']].to_csv(
@@ -175,18 +240,20 @@ for _, row in injected_dataset.iterrows():
     
 print("\n************ Generated injected dataset! ************")
 print("Choose file save format:")
-print("1. Anomrank/F-Fade\n2. Sedanspot\n3. Customize")
+print("1. Anomrank/F-Fade\n2. Sedanspot\n3. MAD \n4. Customize")
 
 
 edges_df = pd.DataFrame(edges)
 
-file_type = input("Select format (1, 2, or 3):")
+file_type = input("Select format (1, 2, 3 or 4):")
 
 if file_type == '1':
-    save_as_anomrank_or_f_fade(edges_df)
+    save_as_anomrank_or_f_fade(injected_dataset)
 elif file_type == '2':
     save_as_sedanspot(edges_df)
 elif file_type == '3':
+    save_as_MAD(injected_dataset)
+elif file_type == '4':
     customize_saving_method(edges_df)
 else:
     print("Invalid selection. Exiting.")
