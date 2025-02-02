@@ -28,6 +28,7 @@ def organized_version(dataset_benign):
     return injected_dataset
 
 def minute_5_gap(dataset_benign):
+    injected_dataset = dataset_benign.copy()
     dataset_benign['time_diff'] = dataset_benign['Session_ID'].diff()
     gaps = dataset_benign[dataset_benign['time_diff'] >= 300].reset_index()
     if gaps.empty:
@@ -108,7 +109,6 @@ if choice in ['rj', '5m', 'or']:
         print("Invalid choice, exiting...")
         exit()
     
-print("************ Generated injected dataset! ************")
 print("How do you want your file to be saved?")
 print("Please type the numbers")
 
@@ -142,7 +142,7 @@ for _, row in injected_dataset.iterrows():
 
 edges_df = pd.DataFrame(edges)
 
-file_type = input("1. Anomrank/F-Fade\n2. Sedanspot.")
+file_type = input("1. Anomrank/F-Fade\n2. Sedanspot.\n")
 if file_type == '1':
     save_as_anomrank_or_f_fade(edges_df)
 elif file_type == '2':
