@@ -145,26 +145,31 @@ def minute_5_gap(injected_dataset, num_logs):
     if not gap_indexes:
         print("No suitable 5-minute gaps found. Exiting.")
         return injected_dataset
-    
-    print("\nAvailable gap indexes (start of 5-minute gaps):")
-    for i in range(0, len(gap_indexes), 5):
-        print("   ".join(f"{idx:>5}" for idx in gap_indexes[i:i+5])) 
 
-    for _ in range(int(num_logs)):
-        try: 
-            gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
-            if gap_index not in gap_indexes:
-                print("Invalid index. Please select from the printed list.")
-                continue
-            malicious_file = preprocess_malicious_dataset()
-            injected_dataset = pd.concat([
-                injected_dataset.iloc[:gap_index+1],
-                malicious_file,
-                injected_dataset.iloc[gap_index+1:]
-            ]).reset_index(drop=True)
 
-        except ValueError:
-            print("Invalid input. Please enter a valid index.")
+    while num_logs:
+            try: 
+                print("\nAvailable gap indexes (start of 5-minute gaps):")
+                for i in range(0, len(gap_indexes), 10):
+                    print("   ".join(f"{idx:>5}" for idx in gap_indexes[i:i+10])) 
+                gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
+                if gap_index not in gap_indexes:
+                    print("Invalid index. Please select from the printed list.")
+                    continue
+                malicious_file = preprocess_malicious_dataset()
+
+                malicious_file["Session_ID"] = malicious_file["Session_ID"].astype(int) - int(malicious_file.loc[0, "Session_ID"]) + 1 + int(injected_dataset.loc[gap_index, "Session_ID"])
+
+                injected_dataset = pd.concat([
+                    injected_dataset.iloc[:gap_index+1],
+                    malicious_file,
+                    injected_dataset.iloc[gap_index+1:]
+                ]).reset_index(drop=True)
+
+                gap_indexes = [i+len(malicious_file) for i in gap_indexes if i != gap_index]
+                num_logs -= 1
+            except ValueError:
+                print("Invalid input. Please enter a valid index.")
 
     print("Malicious logs successfully injected.")
     return injected_dataset
