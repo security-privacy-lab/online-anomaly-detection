@@ -77,8 +77,6 @@ def five_minute_injection(benign_dataset, malicious_dataset):
 
     print(f"{GREEN}Malicious logs successfully injected.{RESET}")
     return injected_dataset
-
-
 def random_injection(benign_dataset, malicious_dataset):
     """Injects malicious logs randomly into the dataset."""
 
@@ -147,9 +145,9 @@ def customize_saving_method(edges_df, filepath):
         print(f"{GREEN}Successfully created the dataset! Exiting...{RESET}")
     else:
         print(f"{YELLOW}No columns selected. Exiting...{RESET}")
-    
 
-def save_as_MAD(injected_data, filepath):
+
+def save_as_MAD(injected_data, filepath, malicious_dataset):
     edges = []
     prev_path = None
 
@@ -177,11 +175,24 @@ def save_as_MAD(injected_data, filepath):
                 'label' : label
             })
         prev_path = current_path
-
     edges_df = pd.DataFrame(edges)
-    edges_df[['timestamp', 'src_node', 'dst_node']].to_csv(
-        f'{filepath}.txt', sep=',', header=False, index=False
+    edges_df[['timestamp', 'src_node', 'dst_node', 'label']].to_csv(
+        f'{filepath}_dataset.txt', sep=',', header=False, index=False
     )
+    dataset_filtered = edges_df[edges_df['label'] == 1]
+
+    query = dataset_filtered[['src_node', 'dst_node']].drop_duplicates()
+    query.to_csv(f'{filepath}_queries.txt',sep=',', header=False,index=False)
+
+    dataset = edges_df.copy()
+    query_nodes = set(query['src_node']).union(set(query['dst_node']))
+    related_edges = dataset[(dataset['src_node'].isin(query_nodes)) | (dataset['dst_node'].isin(query_nodes))]
+    related_edges.to_csv(f"{filepath}_gt.txt",sep=',', index=False,header=None)
+
+
+
+
+
 
 def save_as_anomrank_or_f_fade(injected_dataset, filepath):
     edges = []
@@ -329,7 +340,7 @@ def run():
             save_as_sedanspot(edges_df, filepath)
             awaiting_response = False
         elif file_type == '3':
-            save_as_MAD(injected_dataset, filepath)
+            save_as_MAD(injected_dataset, filepath, malicious_dataset)
             awaiting_response = False
         elif file_type == '4':
             save_as_midas(edges_df, filepath)
