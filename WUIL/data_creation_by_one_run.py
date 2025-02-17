@@ -226,6 +226,13 @@ def save_as_sedanspot(edges_df, filepath):
 
 def save_as_midas(edges_df, filepath):
     """Saves the dataset in Midas format."""
+
+    combined = pd.concat([edges_df["src_node"], edges_df["dst_node"]])
+    factor_mapping = {val: idx for (idx, val) in enumerate(combined.unique())}
+
+    edges_df["src_node"] = edges_df["src_node"].map(factor_mapping)
+    edges_df["dst_node"] = edges_df["dst_node"].map(factor_mapping)
+
     edges_df[['src_node', 'dst_node', 'timestamp']].to_csv(
         f'{filepath}_features.csv', sep=',', header=False, index=False
     )
@@ -258,8 +265,12 @@ def run():
         choice = input(f"Choose injection method: {CYAN}rj{RESET} (random), {CYAN}5m{RESET} (5-minute block), or {CYAN}or{RESET} (organized): ")
         
         if choice in ['rj', '5m', 'or']:
-
-            num_logs = int(input("How many malicious files do you want to inject? : "))
+            while True:
+                try:
+                    num_logs = int(input("How many malicious files do you want to inject? : "))
+                    break
+                except ValueError as e:
+                    print(f"{YELLOW} Error: Please enter an integer.{RESET}")
             
             malicious_datasets = []
 
