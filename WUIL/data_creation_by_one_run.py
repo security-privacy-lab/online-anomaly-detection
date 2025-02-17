@@ -143,7 +143,86 @@ def five_minute_injection(benign_dataset, malicious_dataset):
     print("Malicious logs successfully injected.")
     return injected_dataset
 
+def five_minute_injection_by_percentile(benign_dataset, malicious_dataset):
+    """
+    Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly.
+    The available gap indexes (where a gap exists) are divided into four quartile groups based on their count.
+    When a gap is selected, its relative position (as a percentage of the dataset) is calculated and shown.
+    """
+    
+    # Ensure malicious_dataset is a list.
+    if not isinstance(malicious_dataset, list):
+        malicious_dataset = [malicious_dataset]
 
+    injected_dataset = benign_dataset.copy()
+
+    # Calculate time differences between consecutive Session_IDs (assumed to be integers)
+    diff = injected_dataset['Session_ID'].astype(int).diff(-1).abs()
+    gap_indexes = diff[diff >= 301].index.tolist()
+    gap_indexes_modified = gap_indexes.copy()
+
+    if not gap_indexes:
+        raise Exception("No suitable 5-minute gaps found. Exiting.")
+
+    while malicious_dataset:
+        try:
+            # Ask the user to choose a gap index.
+            insert_loc = int(input("Enter a percentage (0-100) to specify where to inject malicious data (e.g., 50% = middle): "))
+            
+            if insert_loc < 0 or insert_loc > 100:
+                print("Error: Invalid choice! Please enter a valid percentage (0-100).")
+                continue
+
+            # Compute the relative percentage of the dataset for the chosen index.
+            total_length = len(injected_dataset)
+            input_index = int((insert_loc/100)*total_length)
+
+            def bin_search(i, j, target):
+                while i < j-1:
+                    mid = (i+j)//2
+
+                    if gap_indexes[mid] == target:
+                        return mid
+                    
+                    if gap_indexes[mid] > target:
+                        j = mid
+                    else:
+                        i = mid
+
+                return i if target - gap_indexes[i] < gap_indexes[j] - target else j
+
+            insert_index = gap_indexes_modified[bin_search(0, len(gap_indexes)-1, input_index)]
+
+            # Pop the first malicious file and adjust its Session_ID values.
+            malicious_file = malicious_dataset.pop(0)
+            malicious_file["Session_ID"] = (
+                malicious_file["Session_ID"].astype(int)
+                - int(malicious_file.loc[0, "Session_ID"])
+                + 1
+                + int(injected_dataset.loc[insert_index, "Session_ID"])
+            )
+
+            # Inject the malicious logs into the dataset.
+            injected_dataset = pd.concat([
+                injected_dataset.iloc[:insert_index+1],
+                malicious_file,
+                injected_dataset.iloc[insert_index+1:]
+            ]).reset_index(drop=True)
+
+            # Update gap_indexes_modified to account for the inserted malicious logs.
+            new_gap_indexes = []
+            for idx in gap_indexes:
+                if idx > insert_index:
+                    new_gap_indexes.append(idx + len(malicious_file))
+                else:
+                    new_gap_indexes.append(idx)
+            gap_indexes_modified = new_gap_indexes
+
+        except ValueError:
+            print("Error: Invalid input! Please enter a valid integer index.")
+
+    print("Malicious logs successfully injected.")
+    return injected_dataset
 
 def random_injection(benign_dataset, malicious_dataset):
     """Injects malicious logs randomly into the dataset."""
@@ -212,8 +291,6 @@ def customize_saving_method(edges_df, filepath):
         print(f"{GREEN}Successfully created the dataset! Exiting...{RESET}")
     else:
         print(f"{YELLOW}No columns selected. Exiting...{RESET}")
-
-import pandas as pd
 
 def save_as_MAD(injected_dataset, filepath, malicious_dataset):
     edges = []
@@ -483,6 +560,8 @@ def run():
     print(f"{GREEN}Successfully saved data in custom_data folder: exiting...{RESET}")
 if __name__ == "__main__":
     try:
-        run()
+        # run()
+        res = five_minute_injection_by_percentile(pd.DataFrame([[1, 0], [302, 0], [304, 0], [605, 0]], columns = ["Session_ID", "Label"]), [pd.DataFrame([[1, 1], [2, 1]], columns = ["Session_ID", "Label"])])
+        print(res)
     except KeyboardInterrupt:
         print(f"{YELLOW}\nKeyboard interrupt: exiting...{RESET}")
