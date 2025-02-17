@@ -1,6 +1,5 @@
 import pandas as pd
 import random
-import hashlib
 import os
 
 RED = "\033[91m"
@@ -33,50 +32,117 @@ def preprocess_dataset(dataset, benign):
     return dataset
 
 def five_minute_injection(benign_dataset, malicious_dataset):
-    """Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly."""
-
-    # Correct input to type list
+    """
+    Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly.
+    The available gap indexes (where a gap exists) are divided into four quartile groups based on their count.
+    When a gap is selected, its relative position (as a percentage of the dataset) is calculated and shown.
+    """
+    
+    # Ensure malicious_dataset is a list.
     if not isinstance(malicious_dataset, list):
         malicious_dataset = [malicious_dataset]
 
     injected_dataset = benign_dataset.copy()
 
-    difference = pd.DataFrame([], columns= ["time_diff"])
-    difference['time_diff'] = injected_dataset['Session_ID'].astype(int).shift(-1) - injected_dataset['Session_ID'].astype(int)
-    gap_indexes = difference[difference['time_diff'] >= 301].index.tolist()
+    # Calculate time differences between consecutive Session_IDs (assumed to be integers)
+    diff = injected_dataset['Session_ID'].astype(int).diff(-1).abs()
+    gap_indexes = diff[diff >= 301].index.tolist()
 
-    
     if not gap_indexes:
-        raise("No suitable 5-minute gaps found. Exiting.")
+        raise Exception("No suitable 5-minute gaps found. Exiting.")
 
+    # Helper function to divide gap indexes into quartile groups based on their count.
+    def build_quartile_groups(gap_idxs):
+        gap_idxs_sorted = sorted(gap_idxs)
+        n = len(gap_idxs_sorted)
+        quartile_groups = {}
+        # Calculate indices for quartile splits.
+        q1 = n // 4
+        q2 = n // 2
+        q3 = (3 * n) // 4
+
+        quartile_groups["0-25%"] = gap_idxs_sorted[:q1]
+        quartile_groups["25-50%"] = gap_idxs_sorted[q1:q2]
+        quartile_groups["50-75%"] = gap_idxs_sorted[q2:q3]
+        quartile_groups["75-100%"] = gap_idxs_sorted[q3:]
+        return quartile_groups
+
+    quartile_groups = build_quartile_groups(gap_indexes)
 
     while malicious_dataset:
-            try: 
-                print("\nAvailable gap indexes (start of 5-minute gaps):")
-                for i in range(0, len(gap_indexes), 10):
-                    print("   ".join(f"{idx:>5}" for idx in gap_indexes[i:i+10])) 
-                gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
-                
-                if gap_index not in gap_indexes:
-                    print(f"{YELLOW}Error: Invalid choice! Please enter a valid index.{RESET}")
-                    continue
+        try:
+            print("\nAvailable 5-minute gap indexes divided into quartile groups:")
+            for quartile, indexes in quartile_groups.items():
+                if indexes:
+                    print(f"  {quartile} block: " + ", ".join(str(idx) for idx in indexes))
+            
+            # Ask the user to choose a gap index.
+            gap_index = int(input("Enter the index of the gap to inject malicious logs: "))
+            
+            if gap_index not in gap_indexes:
+                print("Error: Invalid choice! Please enter a valid index from the available quartile blocks.")
+                continue
 
-                malicious_file = malicious_dataset.pop(0)
+            # Compute the relative percentage of the dataset for the chosen index.
+            total_length = len(injected_dataset)
+            relative_percent = (gap_index / total_length) * 100
 
-                malicious_file["Session_ID"] = malicious_file["Session_ID"].astype(int) - int(malicious_file.loc[0, "Session_ID"]) + 1 + int(injected_dataset.loc[gap_index, "Session_ID"])
+            # Determine which quartile group the chosen gap_index belongs to.
+            chosen_quartile = None
+            for quartile, indexes in quartile_groups.items():
+                if gap_index in indexes:
+                    chosen_quartile = quartile
+                    break
 
-                injected_dataset = pd.concat([
-                    injected_dataset.iloc[:gap_index+1],
-                    malicious_file,
-                    injected_dataset.iloc[gap_index+1:]
-                ]).reset_index(drop=True)
+            # Provide additional context within the chosen quartile.
+            group = quartile_groups.get(chosen_quartile, [])
+            pos = group.index(gap_index)
+            prev_idx = group[pos-1] if pos > 0 else None
+            next_idx = group[pos+1] if pos < len(group)-1 else None
 
-                gap_indexes = [i+len(malicious_file) for i in gap_indexes if i != gap_index]
-            except ValueError:
-                print(f"{YELLOW}Error: Invalid choice! Please enter a valid index.{RESET}")
+            print(f"\nYou have chosen gap index {gap_index}, which is in the {chosen_quartile} block.")
+            print(f"This corresponds to approximately {relative_percent:.1f}% of the dataset.")
+            if prev_idx is not None:
+                print(f"  Previous gap in this block: {prev_idx}")
+            if next_idx is not None:
+                print(f"  Next gap in this block: {next_idx}")
 
-    print(f"{GREEN}Malicious logs successfully injected.{RESET}")
+            # Pop the first malicious file and adjust its Session_ID values.
+            malicious_file = malicious_dataset.pop(0)
+            malicious_file["Session_ID"] = (
+                malicious_file["Session_ID"].astype(int)
+                - int(malicious_file.loc[0, "Session_ID"])
+                + 1
+                + int(injected_dataset.loc[gap_index, "Session_ID"])
+            )
+
+            # Inject the malicious logs into the dataset.
+            injected_dataset = pd.concat([
+                injected_dataset.iloc[:gap_index+1],
+                malicious_file,
+                injected_dataset.iloc[gap_index+1:]
+            ]).reset_index(drop=True)
+
+            # Update gap_indexes to account for the inserted malicious logs.
+            new_gap_indexes = []
+            for idx in gap_indexes:
+                if idx == gap_index:
+                    continue  # used gap index
+                elif idx > gap_index:
+                    new_gap_indexes.append(idx + len(malicious_file))
+                else:
+                    new_gap_indexes.append(idx)
+            gap_indexes = new_gap_indexes
+
+            # Rebuild the quartile groups based on the updated gap_indexes.
+            quartile_groups = build_quartile_groups(gap_indexes)
+
+        except ValueError:
+            print("Error: Invalid input! Please enter a valid integer index.")
+
+    print("Malicious logs successfully injected.")
     return injected_dataset
+
 
 
 def random_injection(benign_dataset, malicious_dataset):
@@ -127,7 +193,6 @@ def organized_injection(benign_dataset, malicious_dataset):
 
 def customize_saving_method(edges_df, filepath):
     """Allows the user to customize saving columns."""
-
     new_columns = []
     
     while True:
@@ -147,76 +212,140 @@ def customize_saving_method(edges_df, filepath):
         print(f"{GREEN}Successfully created the dataset! Exiting...{RESET}")
     else:
         print(f"{YELLOW}No columns selected. Exiting...{RESET}")
-    
 
-def save_as_MAD(injected_data, filepath):
+import pandas as pd
+
+def save_as_MAD(injected_dataset, filepath, malicious_dataset):
     edges = []
     prev_path = None
+    min_timestamp = injected_dataset['Session_ID'].min()
+    node_mapping = {}
+    next_id = 0 
 
-    for _, row in injected_data.iterrows():
+    # Build the edges dataset
+    for _, row in injected_dataset.iterrows():
         current_path = row['Path']
         timestamp = row['Session_ID']
         label = row['Label']
-        current_path_hashed = int(hashlib.md5(current_path.encode()).hexdigest(), 16) % (10**8)
+        norm_timestamp = int(timestamp) - int(min_timestamp) + 1  # Normalize timestamp
 
-        # Self-edge
+        # Assign unique integer IDs to paths
+        if current_path not in node_mapping:
+            node_mapping[current_path] = next_id
+            next_id += 1
+        current_path_mapped = node_mapping[current_path]
+
+        # Handle self-loops and sequential edges
         if prev_path == current_path:
             edges.append({
-                'src_node' : current_path_hashed,
-                'dst_node': current_path_hashed,
-                'timestamp' : timestamp,
-                'label' : label
-                
+                'src_node': current_path_mapped,
+                'dst_node': current_path_mapped,
+                'timestamp': norm_timestamp,
+                'label': label
             })
         elif prev_path is not None:
-            prev_path_hashed = int(hashlib.md5(prev_path.encode()).hexdigest(), 16) % (10**8)
-            edges.append({      
-                'src_node' : prev_path_hashed,
-                'dst_node': current_path_hashed,
-                'timestamp' : row['Session_ID'],
-                'label' : label
+            if prev_path not in node_mapping:
+                node_mapping[prev_path] = next_id
+                next_id += 1
+            prev_path_mapped = node_mapping[prev_path]
+            edges.append({
+                'src_node': prev_path_mapped,
+                'dst_node': current_path_mapped,
+                'timestamp': norm_timestamp,
+                'label': label
             })
+        
         prev_path = current_path
 
+    # Convert edges to DataFrame
     edges_df = pd.DataFrame(edges)
-    edges_df[['timestamp', 'src_node', 'dst_node']].to_csv(
-        f'{filepath}.txt', sep=',', header=False, index=False
+    edges_df[['timestamp', 'src_node', 'dst_node', 'label']].to_csv(
+        f'{filepath}_data.txt', sep=',', header=False, index=False
     )
+
+    # Filter for malicious edges (where label == 1)
+    dataset_filtered = edges_df[edges_df['label'] == 1]
+    unique_malicious = dataset_filtered.sort_values(by='src_node')
+
+    # Create query dataset
+    query = unique_malicious[['src_node', 'dst_node']].drop_duplicates()
+    query.to_csv(f'{filepath}_queries.txt', sep=',', header=False, index=False)
+
+    # Ensure data types are consistent
+    edges_df['src_node'] = edges_df['src_node'].astype(str)
+    edges_df['dst_node'] = edges_df['dst_node'].astype(str)
+    query['src_node'] = query['src_node'].astype(str)
+    query['dst_node'] = query['dst_node'].astype(str)
+
+    # Capture all edges connected to query nodes
+    query_nodes = set(query['src_node']).union(set(query['dst_node']))
+
+    # Capture ALL edges where BOTH src and dst nodes belong to the query set
+    related_edges = injected_dataset[
+    (injected_dataset['src_node'].isin(query_nodes)) & (injected_dataset['dst_node'].isin(query_nodes))
+    ]
+
+
+    # Ensure proper ordering before saving
+    related_edges = related_edges.sort_values(by=['src_node', 'dst_node'])
+    related_edges.to_csv(f"{filepath}_gt.txt", sep=',', index=False, header=None)
+
+    print("Processing complete. Data saved to:", filepath)
 
 def save_as_anomrank_or_f_fade(injected_dataset, filepath):
     edges = []
     prev_path = None
+    node_mapping = {}  # Store unique path-to-integer mappings
+    next_id = 0  # Start node IDs from 0
+
+    # Calculate the minimum timestamp in the dataset
+    min_timestamp = injected_dataset['Session_ID'].min()
 
     for _, row in injected_dataset.iterrows():
         current_path = row['Path']
         timestamp = row['Session_ID']
         label = row['Label']
-        current_path_hashed = int(hashlib.md5(current_path.encode()).hexdigest(), 16) % (10**8)
 
-        # Self-edge
+        # Normalize the timestamp: subtract the minimum and add 1 so the smallest becomes 1
+        norm_timestamp = int(timestamp) - int(min_timestamp) + 1
+
+        # Map the current path to a unique integer
+        if current_path not in node_mapping:
+            node_mapping[current_path] = next_id
+            next_id += 1
+        current_path_mapped = node_mapping[current_path]
+
+        # Create an edge entry. If the current path is the same as the previous, make it a self-edge.
         if prev_path == current_path:
             edges.append({
-                'src_node' : current_path_hashed,
-                'dst_node': current_path_hashed,
-                'timestamp' : timestamp,
-                'label' : label
-                
+                'src_node': current_path_mapped,
+                'dst_node': current_path_mapped,
+                'timestamp': norm_timestamp,
+                'label': label
             })
         elif prev_path is not None:
-            prev_path_hashed = int(hashlib.md5(prev_path.encode()).hexdigest(), 16) % (10**8)
-            edges.append({      
-                'src_node' : prev_path_hashed,
-                'dst_node': current_path_hashed,
-                'timestamp' : row['Session_ID'],
-                'label' : label
+            # Map the previous path if it isn't mapped yet
+            if prev_path not in node_mapping:
+                node_mapping[prev_path] = next_id
+                next_id += 1
+            prev_path_mapped = node_mapping[prev_path]
+            edges.append({
+                'src_node': prev_path_mapped,
+                'dst_node': current_path_mapped,
+                'timestamp': norm_timestamp,
+                'label': label
             })
+        
         prev_path = current_path
 
+    # Convert to DataFrame
     edges_df = pd.DataFrame(edges)
-    """Saves the dataset in AnomRank or F-Fade format."""
+
+    # Save dataset in the required format: timestamp, src_node, dst_node, label.
     edges_df[['timestamp', 'src_node', 'dst_node', 'label']].to_csv(
-        f'{filepath}', sep=' ', header=False, index=False
+        f'{filepath}.txt', sep=' ', header=False, index=False
     )
+
 
 def save_as_sedanspot(edges_df, filepath):
     """Saves the dataset in SedanSpot format."""
@@ -340,7 +469,7 @@ def run():
             save_as_sedanspot(edges_df, filepath)
             awaiting_response = False
         elif file_type == '3':
-            save_as_MAD(injected_dataset, filepath)
+            save_as_MAD(injected_dataset, filepath, malicious_dataset)
             awaiting_response = False
         elif file_type == '4':
             save_as_midas(edges_df, filepath)
