@@ -292,7 +292,7 @@ def customize_saving_method(edges_df, filepath):
     else:
         print(f"{YELLOW}No columns selected. Exiting...{RESET}")
 
-def save_as_MAD(injected_dataset, filepath, malicious_dataset):
+def save_as_MAD(injected_dataset, filepath):
     edges = []
     prev_path = None
     min_timestamp = injected_dataset['Session_ID'].min()
@@ -336,36 +336,25 @@ def save_as_MAD(injected_dataset, filepath, malicious_dataset):
 
     # Convert edges to DataFrame
     edges_df = pd.DataFrame(edges)
-    edges_df[['timestamp', 'src_node', 'dst_node', 'label']].to_csv(
+    edges_df[['src_node', 'dst_node', 'timestamp']] = edges_df[['src_node', 'dst_node', 'timestamp']].astype(int)
+    edges_df[['src_node', 'dst_node', 'timestamp']].to_csv(
         f'{filepath}_data.txt', sep=',', header=False, index=False
     )
 
     # Filter for malicious edges (where label == 1)
     dataset_filtered = edges_df[edges_df['label'] == 1]
-    unique_malicious = dataset_filtered.sort_values(by='src_node')
 
     # Create query dataset
-    query = unique_malicious[['src_node', 'dst_node']].drop_duplicates()
+    query = dataset_filtered[['src_node', 'dst_node']].drop_duplicates()
+    query = query[['src_node', 'dst_node']]
+    query = query.sort_values(by=['src_node','dst_node'])
     query.to_csv(f'{filepath}_queries.txt', sep=',', header=False, index=False)
 
-    # Ensure data types are consistent
-    edges_df['src_node'] = edges_df['src_node'].astype(str)
-    edges_df['dst_node'] = edges_df['dst_node'].astype(str)
-    query['src_node'] = query['src_node'].astype(str)
-    query['dst_node'] = query['dst_node'].astype(str)
-
-    # Capture all edges connected to query nodes
-    query_nodes = set(query['src_node']).union(set(query['dst_node']))
-
-    # Capture ALL edges where BOTH src and dst nodes belong to the query set
-    related_edges = injected_dataset[
-    (injected_dataset['src_node'].isin(query_nodes)) & (injected_dataset['dst_node'].isin(query_nodes))
-    ]
-
-
-    # Ensure proper ordering before saving
-    related_edges = related_edges.sort_values(by=['src_node', 'dst_node'])
-    related_edges.to_csv(f"{filepath}_gt.txt", sep=',', index=False, header=None)
+    # Work on ground truth values
+    query_edge = set(query.apply(tuple, axis=1))
+    related_edges = edges_df[edges_df[['src_node', 'dst_node']].apply(tuple, axis=1).isin(query_edge)]
+    related_edges = related_edges.sort_values(by=['src_node', 'dst_node', 'timestamp'])
+    related_edges.to_csv(f"{filepath}_gt.txt",sep=',',index=False, header=None)
 
     print("Processing complete. Data saved to:", filepath)
 
@@ -546,7 +535,7 @@ def run():
             save_as_sedanspot(edges_df, filepath)
             awaiting_response = False
         elif file_type == '3':
-            save_as_MAD(injected_dataset, filepath, malicious_dataset)
+            save_as_MAD(injected_dataset, filepath)
             awaiting_response = False
         elif file_type == '4':
             save_as_midas(edges_df, filepath)
@@ -560,7 +549,7 @@ def run():
     print(f"{GREEN}Successfully saved data in custom_data folder: exiting...{RESET}")
 if __name__ == "__main__":
     try:
-        # run()
+        run()
         res = five_minute_injection_by_percentile(pd.DataFrame([[1, 0], [302, 0], [304, 0], [605, 0]], columns = ["Session_ID", "Label"]), [pd.DataFrame([[1, 1], [2, 1]], columns = ["Session_ID", "Label"])])
         print(res)
     except KeyboardInterrupt:
