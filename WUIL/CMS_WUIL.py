@@ -1,19 +1,18 @@
 import math, random, collections
 from datetime import datetime
 
+
 class CountMinSketch:
+
     def __init__(self, epsilon=0.001, delta=0.01):
         self.epsilon = epsilon
         self.delta = delta
         self.width = int(math.ceil(math.e / epsilon))
-        
         self.depth = int(math.ceil(math.log(1.0/delta, 2)))
         self.table = [[0] * self.width for _ in range(self.depth)]
-        
         self.hash_seeds = [random.randint(1, 1000000) for _ in range(self.depth)]
     
     def _hash(self, item, i):
-        
         return (hash(str(item)) ^ self.hash_seeds[i]) % self.width
     
     def update(self, item, count=1):
@@ -28,82 +27,97 @@ class CountMinSketch:
             estimates.append(self.table[i][idx])
         return min(estimates)
 
-def parse_wuil_line(line):
+##############################
+# Parsing function for the dataset
+##############################
+
+def parse_dataset_line(line):
+    """
+    Parses a line from the dataset file in the format:
+       src_node|dst_node|timestamp|label
+       
+
+    """
+    # Skip header lines
+    if line.lower().startswith("src_node") or not line.strip():
+        return None
     parts = line.strip().split('|')
-    if len(parts) < 6:
+    if len(parts) < 4:
         return None
-    date_str = parts[1].strip()    
-    time_raw = parts[2].strip()    
-    time_str = time_raw.split()[0]  
-    dt_str = f"{date_str} {time_str}"
-    try:
-        dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
-    except ValueError as e:
-        print(f"Error parsing datetime from '{dt_str}': {e}")
-        return None
-    timestamp = dt.timestamp()
-    nodes_str = parts[5].strip()   # e.g., "0\\1\\2\\3\\4"
-    nodes = [token for token in nodes_str.split('\\') if token]
-    if not nodes:
-        return None
-    depth = len(nodes)
-    end_node = nodes[-1]
-    return timestamp, depth, end_node
-
-
-
-def process_wuil_file_cms_fixed_window(filename, window_size=10, epsilon=0.001, delta=0.01):
-
-    cms = CountMinSketch(epsilon, delta)
+    src_chain = parts[0].strip()  # e.g., "0\1\2\3\4"
+    timestamp_str = parts[2].strip()  # e.g., "35396524"
+    label_str = parts[3].strip()
     
-    window = collections.deque()
+    try:
+        timestamp = float(timestamp_str)
+    except ValueError:
+        print(f"Error converting timestamp: {timestamp_str}")
+        return None
+    
+    try:
+        label = int(label_str)
+    except ValueError:
+        label = 0
+    
+    src_nodes = [token for token in src_chain.split('\\') if token]
+    if not src_nodes:
+        return None
+    depth = len(src_nodes)
+    end_node = src_nodes[-1]
+    
+    return timestamp, depth, end_node, label
+
+
+def process_dataset_cms_fixed_window(filename, window_size=10, epsilon=0.001, delta=0.01):
+    cms = CountMinSketch(epsilon, delta)
+    window = collections.deque()  # will store tuples: (timestamp, depth, label, end_node)
     rolling_depth_sum = 0.0
 
     with open(filename, 'r') as f:
         for line in f:
-            parsed = parse_wuil_line(line)
+            parsed = parse_dataset_line(line)
             if parsed is None:
-                print(f"Skipping invalid line: {line.strip()}")
                 continue
-            timestamp, depth, end_node = parsed
+            timestamp, depth, end_node, label = parsed
             
-            
+            # If window is full, remove the oldest record and update CMS negatively.
             if len(window) == window_size:
-                oldest_timestamp, oldest_depth, oldest_end_node = window.popleft()
+                oldest = window.popleft()
+                oldest_timestamp, oldest_depth, oldest_label, oldest_end_node = oldest
                 cms.update(oldest_end_node, -1)
                 rolling_depth_sum -= oldest_depth
             
-            
-            window.append((timestamp, depth, end_node))
+            # Add the new record.
+            window.append((timestamp, depth, label, end_node))
             cms.update(end_node, 1)
             rolling_depth_sum += depth
             
-            
+            # Compute rolling average depth.
             avg_depth = rolling_depth_sum / len(window)
             
-            
+            # Compute rolling average inter-arrival time.
             if len(window) > 1:
-                timestamps = [record[0] for record in window]
-                
+                timestamps = [r[0] for r in window]
                 diffs = [t2 - t1 for t1, t2 in zip(timestamps, timestamps[1:])]
                 avg_interarrival = sum(diffs) / len(diffs)
             else:
                 avg_interarrival = None
             
-           
+            # Query CMS for approximate frequency of current end_node.
             approx_freq = cms.query(end_node)
             
             print(f"Line: {line.strip()}")
             print(f"  -> Timestamp: {timestamp:.2f}")
-            print(f"  -> Depth (chain length): {depth}")
+            print(f"  -> Depth: {depth}")
             print(f"  -> End node: {end_node}")
             print(f"  -> Rolling average depth (last {len(window)} records): {avg_depth:.2f}")
             if avg_interarrival is not None:
-                print(f"  -> Rolling avg inter-arrival time: {avg_interarrival:.2f} s")
+                print(f"  -> Rolling average inter-arrival time: {avg_interarrival:.2f} s")
             else:
                 print("  -> Not enough data for inter-arrival time yet.")
-            print(f"  -> Approx frequency of end node '{end_node}' in window: {approx_freq}\n")
+            print(f"  -> Approx frequency of end node '{end_node}' in window: {approx_freq}")
+            print(f"  -> Label: {label}\n")
 
 if __name__ == "__main__":
-    
-    process_wuil_file_cms_fixed_window('user1_log.txt', window_size=10, epsilon=0.001, delta=0.01)
+
+    process_dataset_cms_fixed_window('testtest..csv', window_size=10, epsilon=0.001, delta=0.01)
