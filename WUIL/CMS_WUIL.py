@@ -1,131 +1,128 @@
-import math, random, collections
-from datetime import datetime
-class CountMinSketch:
+import sys
+from collections.abc import Iterable
+from typing import Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
+from typing_extensions import TypeAlias
 
-    def __init__(self, epsilon=0.001, delta=0.01):
-        self.epsilon = epsilon
-        self.delta = delta
-        self.width = int(math.ceil(math.e / epsilon))
-        self.depth = int(math.ceil(math.log(1.0/delta, 2)))
-        self.table = [[0] * self.width for _ in range(self.depth)]
-        self.hash_seeds = [random.randint(1, 1000000) for _ in range(self.depth)]
-    
-    def _hash(self, item, i):
-        return (hash(str(item)) ^ self.hash_seeds[i]) % self.width
-    
-    def update(self, item, count=1):
-        for i in range(self.depth):
-            idx = self._hash(item, i)
-            self.table[i][idx] += count
-    
-    def query(self, item):
-        estimates = []
-        for i in range(self.depth):
-            idx = self._hash(item, i)
-            estimates.append(self.table[i][idx])
-        return min(estimates)
+_T = TypeVar("_T")
+_T_co = TypeVar("_T_co", covariant=True)
 
-##############################
-# Parsing function for the dataset
-##############################
+_SupportsFloatOrIndex: TypeAlias = SupportsFloat | SupportsIndex
 
-def parse_dataset_line(line):
+e: float
+pi: float
+inf: float
+nan: float
+tau: float
 
-    # Skip header lines
-    if line.lower().startswith("src_node") or not line.strip():
-        return None
-    parts = line.strip().split('|')
-    if len(parts) < 4:
-        return None
-    src_chain = parts[0].strip()      # e.g., "0\1\2\3\4"
-    dst_chain = parts[1].strip()      # e.g., "0\1\2\3\4" or "0\1\2\3\7\4"
-    timestamp_str = parts[2].strip()  # e.g., "35396524"
-    label_str = parts[3].strip()
-    
-    try:
-        timestamp = float(timestamp_str)
-    except ValueError:
-        print(f"Error converting timestamp: {timestamp_str}")
-        return None
-    try:
-        label = int(label_str)
-    except ValueError:
-        label = 0
+def acos(x: _SupportsFloatOrIndex, /) -> float: ...
+def acosh(x: _SupportsFloatOrIndex, /) -> float: ...
+def asin(x: _SupportsFloatOrIndex, /) -> float: ...
+def asinh(x: _SupportsFloatOrIndex, /) -> float: ...
+def atan(x: _SupportsFloatOrIndex, /) -> float: ...
+def atan2(y: _SupportsFloatOrIndex, x: _SupportsFloatOrIndex, /) -> float: ...
+def atanh(x: _SupportsFloatOrIndex, /) -> float: ...
 
-    # Compute source chain info.
-    src_nodes = [token for token in src_chain.split('\\') if token]
-    if not src_nodes:
-        return None
-    src_depth = len(src_nodes)
-    src_end = src_nodes[-1]
-    
-    # Compute destination chain info.
-    dst_nodes = [token for token in dst_chain.split('\\') if token]
-    if not dst_nodes:
-        return None
-    dst_depth = len(dst_nodes)
-    dst_end = dst_nodes[-1]
-    
-    # Define a combined depth (average of the two depths)
-    combined_depth = (src_depth + dst_depth) / 2.0
-    
-    # Define a combined end_node as a tuple.
-    combined_end = (src_end, dst_end)
-    
-    return timestamp, combined_depth, combined_end, label
+if sys.version_info >= (3, 11):
+    def cbrt(x: _SupportsFloatOrIndex, /) -> float: ...
 
+class _SupportsCeil(Protocol[_T_co]):
+    def __ceil__(self) -> _T_co: ...
 
-def process_dataset_cms_fixed_window(filename, window_size=10, epsilon=0.001, delta=0.01):
+@overload
+def ceil(x: _SupportsCeil[_T], /) -> _T: ...
+@overload
+def ceil(x: _SupportsFloatOrIndex, /) -> int: ...
+def comb(n: SupportsIndex, k: SupportsIndex, /) -> int: ...
+def copysign(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+def cos(x: _SupportsFloatOrIndex, /) -> float: ...
+def cosh(x: _SupportsFloatOrIndex, /) -> float: ...
+def degrees(x: _SupportsFloatOrIndex, /) -> float: ...
+def dist(p: Iterable[_SupportsFloatOrIndex], q: Iterable[_SupportsFloatOrIndex], /) -> float: ...
+def erf(x: _SupportsFloatOrIndex, /) -> float: ...
+def erfc(x: _SupportsFloatOrIndex, /) -> float: ...
+def exp(x: _SupportsFloatOrIndex, /) -> float: ...
 
-    cms = CountMinSketch(epsilon, delta)
-    window = collections.deque()  # will store tuples: (timestamp, combined_depth, label, combined_end)
-    rolling_depth_sum = 0.0
+if sys.version_info >= (3, 11):
+    def exp2(x: _SupportsFloatOrIndex, /) -> float: ...
 
-    with open(filename, 'r') as f:
-        for line in f:
-            parsed = parse_dataset_line(line)
-            if parsed is None:
-                continue
-            timestamp, combined_depth, combined_end, label = parsed
-            
-            # If window is full, remove the oldest record.
-            if len(window) == window_size:
-                oldest = window.popleft()
-                oldest_timestamp, oldest_depth, oldest_label, oldest_combined_end = oldest
-                cms.update(oldest_combined_end, -1)
-                rolling_depth_sum -= oldest_depth
-            
-            # Add new record.
-            window.append((timestamp, combined_depth, label, combined_end))
-            cms.update(combined_end, 1)
-            rolling_depth_sum += combined_depth
-            
-            # Compute rolling average combined depth.
-            avg_depth = rolling_depth_sum / len(window)
-            
-            # Compute rolling average inter-arrival time.
-            if len(window) > 1:
-                timestamps = [r[0] for r in window]
-                diffs = [t2 - t1 for t1, t2 in zip(timestamps, timestamps[1:])]
-                avg_interarrival = sum(diffs) / len(diffs)
-            else:
-                avg_interarrival = None
-            
-        
-            approx_freq = cms.query(combined_end)
-            
-            print(f"Line: {line.strip()}")
-            print(f"  -> Timestamp: {timestamp:.2f}")
-            print(f"  -> Combined Depth (avg of src & dst depths): {combined_depth:.2f}")
-            print(f"  -> Combined end node: {combined_end}")
-            print(f"  -> Rolling average combined depth (last {len(window)} records): {avg_depth:.2f}")
-            if avg_interarrival is not None:
-                print(f"  -> Rolling average inter-arrival time: {avg_interarrival:.2f} s")
-            else:
-                print("  -> Not enough data for inter-arrival time yet.")
-            print(f"  -> Approx frequency of combined end node {combined_end} in window: {approx_freq}")
-            print(f"  -> Label: {label}\n")
+def expm1(x: _SupportsFloatOrIndex, /) -> float: ...
+def fabs(x: _SupportsFloatOrIndex, /) -> float: ...
+def factorial(x: SupportsIndex, /) -> int: ...
 
-if __name__ == "__main__":
-    # Replace 'dataset.txt' with your dataset file path.
-    process_dataset_cms_fixed_window('testtest..csv', window_size=10, epsilon=0.001, delta=0.01)
+class _SupportsFloor(Protocol[_T_co]):
+    def __floor__(self) -> _T_co: ...
+
+@overload
+def floor(x: _SupportsFloor[_T], /) -> _T: ...
+@overload
+def floor(x: _SupportsFloatOrIndex, /) -> int: ...
+def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]: ...
+def fsum(seq: Iterable[_SupportsFloatOrIndex], /) -> float: ...
+def gamma(x: _SupportsFloatOrIndex, /) -> float: ...
+
+if sys.version_info >= (3, 9):
+    def gcd(*integers: SupportsIndex) -> int: ...
+
+else:
+    def gcd(x: SupportsIndex, y: SupportsIndex, /) -> int: ...
+
+def hypot(*coordinates: _SupportsFloatOrIndex) -> float: ...
+def isclose(
+    a: _SupportsFloatOrIndex,
+    b: _SupportsFloatOrIndex,
+    *,
+    rel_tol: _SupportsFloatOrIndex = 1e-09,
+    abs_tol: _SupportsFloatOrIndex = 0.0,
+) -> bool: ...
+def isinf(x: _SupportsFloatOrIndex, /) -> bool: ...
+def isfinite(x: _SupportsFloatOrIndex, /) -> bool: ...
+def isnan(x: _SupportsFloatOrIndex, /) -> bool: ...
+def isqrt(n: SupportsIndex, /) -> int: ...
+
+if sys.version_info >= (3, 9):
+    def lcm(*integers: SupportsIndex) -> int: ...
+
+def ldexp(x: _SupportsFloatOrIndex, i: int, /) -> float: ...
+def lgamma(x: _SupportsFloatOrIndex, /) -> float: ...
+def log(x: _SupportsFloatOrIndex, base: _SupportsFloatOrIndex = ...) -> float: ...
+def log10(x: _SupportsFloatOrIndex, /) -> float: ...
+def log1p(x: _SupportsFloatOrIndex, /) -> float: ...
+def log2(x: _SupportsFloatOrIndex, /) -> float: ...
+def modf(x: _SupportsFloatOrIndex, /) -> tuple[float, float]: ...
+
+if sys.version_info >= (3, 12):
+    def nextafter(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /, *, steps: SupportsIndex | None = None) -> float: ...
+
+elif sys.version_info >= (3, 9):
+    def nextafter(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+
+def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int: ...
+def pow(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+@overload
+def prod(iterable: Iterable[SupportsIndex], /, *, start: SupportsIndex = 1) -> int: ...  # type: ignore[overload-overlap]
+@overload
+def prod(iterable: Iterable[_SupportsFloatOrIndex], /, *, start: _SupportsFloatOrIndex = 1) -> float: ...
+def radians(x: _SupportsFloatOrIndex, /) -> float: ...
+def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+def sin(x: _SupportsFloatOrIndex, /) -> float: ...
+def sinh(x: _SupportsFloatOrIndex, /) -> float: ...
+
+if sys.version_info >= (3, 12):
+    def sumprod(p: Iterable[float], q: Iterable[float], /) -> float: ...
+
+def sqrt(x: _SupportsFloatOrIndex, /) -> float: ...
+def tan(x: _SupportsFloatOrIndex, /) -> float: ...
+def tanh(x: _SupportsFloatOrIndex, /) -> float: ...
+
+# Is different from `_typeshed.SupportsTrunc`, which is not generic
+class _SupportsTrunc(Protocol[_T_co]):
+    def __trunc__(self) -> _T_co: ...
+
+def trunc(x: _SupportsTrunc[_T], /) -> _T: ...
+
+if sys.version_info >= (3, 9):
+    def ulp(x: _SupportsFloatOrIndex, /) -> float: ...
+
+if sys.version_info >= (3, 13):
+    def fma(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, z: _SupportsFloatOrIndex, /) -> float: ...
