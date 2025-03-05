@@ -1,128 +1,141 @@
-import sys
-from collections.abc import Iterable
-from typing import Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
-from typing_extensions import TypeAlias
+import math, random, collections
+from datetime import datetime
 
-_T = TypeVar("_T")
-_T_co = TypeVar("_T_co", covariant=True)
+class CountMinSketch:
+    def __init__(self, epsilon, delta):
+        self.epsilon = epsilon
+        self.delta = delta
+        self.width = int(math.ceil(math.e / epsilon))
+        self.depth = int(math.ceil(math.log(1.0/delta, 2)))
+        self.table = [[0] * self.width for _ in range(self.depth)]
+        self.hash_seeds = [random.randint(1, 1000000) for _ in range(self.depth)]
+    
+    def _hash(self, item, i):
+        return (hash(str(item)) ^ self.hash_seeds[i]) % self.width
+    
+    def update(self, item, count=1):
+        for i in range(self.depth):
+            idx = self._hash(item, i)
+            self.table[i][idx] += count
+    
+    def query(self, item):
+        estimates = []
+        for i in range(self.depth):
+            idx = self._hash(item, i)
+            estimates.append(self.table[i][idx])
+        return min(estimates)
 
-_SupportsFloatOrIndex: TypeAlias = SupportsFloat | SupportsIndex
+#########################################
+# Updated parsing function for the dataset
+#########################################
 
-e: float
-pi: float
-inf: float
-nan: float
-tau: float
+def parse_dataset_line(line):
+    # Skip header lines or empty lines
+    if line.lower().startswith("src_node") or not line.strip():
+        return None
+    parts = line.strip().split('|')
+    if len(parts) < 4:
+        return None
+    src_chain = parts[0].strip()      
+    dst_chain = parts[1].strip()      
+    timestamp_str = parts[2].strip()  
+    label_str = parts[3].strip()
+    
+    try:
+        timestamp = float(timestamp_str)
+    except ValueError:
+        print(f"Error converting timestamp: {timestamp_str}")
+        return None
+    try:
+        label = int(label_str)
+    except ValueError:
+        label = 0
 
-def acos(x: _SupportsFloatOrIndex, /) -> float: ...
-def acosh(x: _SupportsFloatOrIndex, /) -> float: ...
-def asin(x: _SupportsFloatOrIndex, /) -> float: ...
-def asinh(x: _SupportsFloatOrIndex, /) -> float: ...
-def atan(x: _SupportsFloatOrIndex, /) -> float: ...
-def atan2(y: _SupportsFloatOrIndex, x: _SupportsFloatOrIndex, /) -> float: ...
-def atanh(x: _SupportsFloatOrIndex, /) -> float: ...
+    # Compute source chain info.
+    src_nodes = [token for token in src_chain.split('\\') if token]
+    if not src_nodes:
+        return None
+    src_depth = len(src_nodes)
+    src_end = src_nodes[-1]
+    
+    # Compute destination chain info.
+    dst_nodes = [token for token in dst_chain.split('\\') if token]
+    if not dst_nodes:
+        return None
+    dst_depth = len(dst_nodes)
+    dst_end = dst_nodes[-1]
+    
+    # Return all separate pieces: timestamp, source depth, destination depth, source end, destination end, label.
+    return timestamp, src_depth, dst_depth, src_end, dst_end, label
 
-if sys.version_info >= (3, 11):
-    def cbrt(x: _SupportsFloatOrIndex, /) -> float: ...
+#########################################
+# Updated processing function to track source and destination depths separately
+#########################################
 
-class _SupportsCeil(Protocol[_T_co]):
-    def __ceil__(self) -> _T_co: ...
+def process_dataset_cms_fixed_window(filename, window_size=10, epsilon=0.001, delta=0.01):
 
-@overload
-def ceil(x: _SupportsCeil[_T], /) -> _T: ...
-@overload
-def ceil(x: _SupportsFloatOrIndex, /) -> int: ...
-def comb(n: SupportsIndex, k: SupportsIndex, /) -> int: ...
-def copysign(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-def cos(x: _SupportsFloatOrIndex, /) -> float: ...
-def cosh(x: _SupportsFloatOrIndex, /) -> float: ...
-def degrees(x: _SupportsFloatOrIndex, /) -> float: ...
-def dist(p: Iterable[_SupportsFloatOrIndex], q: Iterable[_SupportsFloatOrIndex], /) -> float: ...
-def erf(x: _SupportsFloatOrIndex, /) -> float: ...
-def erfc(x: _SupportsFloatOrIndex, /) -> float: ...
-def exp(x: _SupportsFloatOrIndex, /) -> float: ...
+    # Two separate Count-Min Sketches: one for source depth and one for destination depth.
+    cms_source = CountMinSketch(epsilon, delta)
+    cms_destination = CountMinSketch(epsilon, delta)
+    
+    # Window will store tuples: (timestamp, src_depth, dst_depth, src_end, dst_end, label)
+    window = collections.deque()  
+    rolling_src_depth_sum = 0.0
+    rolling_dst_depth_sum = 0.0
 
-if sys.version_info >= (3, 11):
-    def exp2(x: _SupportsFloatOrIndex, /) -> float: ...
+    with open(filename, 'r') as f:
+        for line in f:
+            parsed = parse_dataset_line(line)
+            if parsed is None:
+                continue
+            
+            timestamp, src_depth, dst_depth, src_end, dst_end, label = parsed
+            
+            # If window is full, remove the oldest record.
+            if len(window) == window_size:
+                oldest = window.popleft()
+                oldest_timestamp, oldest_src_depth, oldest_dst_depth, oldest_src_end, oldest_dst_end, oldest_label = oldest
+                cms_source.update(oldest_src_depth, -1)
+                cms_destination.update(oldest_dst_depth, -1)
+                rolling_src_depth_sum -= oldest_src_depth
+                rolling_dst_depth_sum -= oldest_dst_depth
+            
+            # Add new record.
+            window.append((timestamp, src_depth, dst_depth, src_end, dst_end, label))
+            cms_source.update(src_depth, 1)
+            cms_destination.update(dst_depth, 1)
+            rolling_src_depth_sum += src_depth
+            rolling_dst_depth_sum += dst_depth
+            
+            # Compute rolling averages.
+            avg_src_depth = rolling_src_depth_sum / len(window)
+            avg_dst_depth = rolling_dst_depth_sum / len(window)
+            
+            # Compute rolling average inter-arrival time.
+            if len(window) > 1:
+                timestamps = [r[0] for r in window]
+                diffs = [t2 - t1 for t1, t2 in zip(timestamps, timestamps[1:])]
+                avg_interarrival = sum(diffs) / len(diffs)
+            else:
+                avg_interarrival = None
+            
+            # Query the CMS for the frequency of the current source and destination depths.
+            approx_freq_source = cms_source.query(src_depth)
+            approx_freq_destination = cms_destination.query(dst_depth)
+            
+            print(f"Line: {line.strip()}")
+            print(f"  -> Timestamp: {timestamp:.2f}")
+            print(f"  -> Source Depth: {src_depth}")
+            print(f"  -> Destination Depth: {dst_depth}")
+            print(f"  -> Average depth in source(last {len(window)} records): {avg_src_depth:.2f}")
+            print(f"  -> Average depth in the destination (last {len(window)} records): {avg_dst_depth:.2f}")
+            if avg_interarrival is not None:
+                print(f"  -> Average time gap between each record in the window {avg_interarrival:.2f} s")
+            else:
+                print("  -> Not enough data for inter-arrival time yet.")
+            print(f"  -> Approx frequency of Source Depth {src_depth} in window: {approx_freq_source}")
+            print(f"  -> Approx frequency of Destination Depth {dst_depth} in window: {approx_freq_destination}")
+            print(f"  -> Label: {label}\n")
 
-def expm1(x: _SupportsFloatOrIndex, /) -> float: ...
-def fabs(x: _SupportsFloatOrIndex, /) -> float: ...
-def factorial(x: SupportsIndex, /) -> int: ...
-
-class _SupportsFloor(Protocol[_T_co]):
-    def __floor__(self) -> _T_co: ...
-
-@overload
-def floor(x: _SupportsFloor[_T], /) -> _T: ...
-@overload
-def floor(x: _SupportsFloatOrIndex, /) -> int: ...
-def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]: ...
-def fsum(seq: Iterable[_SupportsFloatOrIndex], /) -> float: ...
-def gamma(x: _SupportsFloatOrIndex, /) -> float: ...
-
-if sys.version_info >= (3, 9):
-    def gcd(*integers: SupportsIndex) -> int: ...
-
-else:
-    def gcd(x: SupportsIndex, y: SupportsIndex, /) -> int: ...
-
-def hypot(*coordinates: _SupportsFloatOrIndex) -> float: ...
-def isclose(
-    a: _SupportsFloatOrIndex,
-    b: _SupportsFloatOrIndex,
-    *,
-    rel_tol: _SupportsFloatOrIndex = 1e-09,
-    abs_tol: _SupportsFloatOrIndex = 0.0,
-) -> bool: ...
-def isinf(x: _SupportsFloatOrIndex, /) -> bool: ...
-def isfinite(x: _SupportsFloatOrIndex, /) -> bool: ...
-def isnan(x: _SupportsFloatOrIndex, /) -> bool: ...
-def isqrt(n: SupportsIndex, /) -> int: ...
-
-if sys.version_info >= (3, 9):
-    def lcm(*integers: SupportsIndex) -> int: ...
-
-def ldexp(x: _SupportsFloatOrIndex, i: int, /) -> float: ...
-def lgamma(x: _SupportsFloatOrIndex, /) -> float: ...
-def log(x: _SupportsFloatOrIndex, base: _SupportsFloatOrIndex = ...) -> float: ...
-def log10(x: _SupportsFloatOrIndex, /) -> float: ...
-def log1p(x: _SupportsFloatOrIndex, /) -> float: ...
-def log2(x: _SupportsFloatOrIndex, /) -> float: ...
-def modf(x: _SupportsFloatOrIndex, /) -> tuple[float, float]: ...
-
-if sys.version_info >= (3, 12):
-    def nextafter(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /, *, steps: SupportsIndex | None = None) -> float: ...
-
-elif sys.version_info >= (3, 9):
-    def nextafter(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-
-def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int: ...
-def pow(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-@overload
-def prod(iterable: Iterable[SupportsIndex], /, *, start: SupportsIndex = 1) -> int: ...  # type: ignore[overload-overlap]
-@overload
-def prod(iterable: Iterable[_SupportsFloatOrIndex], /, *, start: _SupportsFloatOrIndex = 1) -> float: ...
-def radians(x: _SupportsFloatOrIndex, /) -> float: ...
-def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-def sin(x: _SupportsFloatOrIndex, /) -> float: ...
-def sinh(x: _SupportsFloatOrIndex, /) -> float: ...
-
-if sys.version_info >= (3, 12):
-    def sumprod(p: Iterable[float], q: Iterable[float], /) -> float: ...
-
-def sqrt(x: _SupportsFloatOrIndex, /) -> float: ...
-def tan(x: _SupportsFloatOrIndex, /) -> float: ...
-def tanh(x: _SupportsFloatOrIndex, /) -> float: ...
-
-# Is different from `_typeshed.SupportsTrunc`, which is not generic
-class _SupportsTrunc(Protocol[_T_co]):
-    def __trunc__(self) -> _T_co: ...
-
-def trunc(x: _SupportsTrunc[_T], /) -> _T: ...
-
-if sys.version_info >= (3, 9):
-    def ulp(x: _SupportsFloatOrIndex, /) -> float: ...
-
-if sys.version_info >= (3, 13):
-    def fma(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, z: _SupportsFloatOrIndex, /) -> float: ...
+if __name__ == "__main__":
+    process_dataset_cms_fixed_window('testtest..csv', window_size=10, epsilon=0.001, delta=0.01)
