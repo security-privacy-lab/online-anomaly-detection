@@ -13,7 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
-
+# Purpose:
+#   Computes the ROC-AUC between the ground-truth labels and anomaly scores,
+#   prints the result, and optionally writes it to a file for automated
+#   experiment pipelines.
+#
+# Why keep it:
+#   • Standardizes evaluation: ensures all MIDAS variants are scored
+#     consistently using the same metrics and thresholds  
+#   • Integrates seamlessly with the demo and experiment drivers
+#     (`Demo.cpp`, `Experiment.cpp`) via system calls  
+#   • Simplifies reproducibility: users need only run this script to
+#     get AUC values in both human-readable and machine-parsable form  
+#
+# Usage:
+#   python util/EvaluateScore.py <pathGroundTruth> <pathScore> [<indexRun>]
+#
+#   - <pathGroundTruth>: CSV file of true labels (0/1)  
+#   - <pathScore>:      CSV file of anomaly scores (one float per line)  
+#   - [<indexRun>]:     Optional run index; if provided, AUC is also
+#                       saved to `temp/AUC<indexRun>.txt`
+#
+# Output:
+#   Prints “ROC-AUC<indexRun> = <value>” to stdout and writes the
+#   AUC to `temp/AUC<indexRun>.txt` when `indexRun` is given.
+# ------------------------------------------------------------------------------
 from pathlib import Path
 from sys import argv
 
