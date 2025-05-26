@@ -22,6 +22,35 @@
 // SOFTWARE.
 // -----------------------------------------------------------------------------
 #pragma once
+// -----------------------------------------------------------------------------
+//
+// Purpose:
+//   Provides a header‐only implementation of the Area Under the Receiver
+//   Operating Characteristic (ROC-AUC) metric for binary classification,
+//   optimized for streaming score arrays. Accepts raw label and score arrays,
+//   sorts in descending score order, computes true‐positive and false‐positive
+//   rates, and returns the integrated ROC‐AUC value in [0.0, 1.0].
+//
+// Why keep it:
+//   • Ensures a self‐contained, lightweight evaluation of anomaly scores
+//     without external dependencies  
+//   • Avoids linking heavyweight libraries when only AUC computation is needed  
+//   • Offers a template for in‐place, on‐device ROC‐AUC scoring in C++ pipelines  
+//   • Complements the Python `EvaluateScore.py` for users who prefer native C++  
+//
+// Key features:
+//   • Template‐based for any floating‐point type  
+//   • Single‐pass checks for NaN/Inf and valid labels  
+//   • O(n log n) sorting + O(n) ROC point reduction for efficiency  
+//   • No dynamic dependencies—just standard C++ library  
+//
+// Usage:
+//   ```cpp
+//   std::vector<float> labels = {0,1,0,1,…};
+//   std::vector<float> scores = {0.1,0.9,0.2,0.8,…};
+//   double auc = AUROC(labels.data(), scores.data(), labels.size());
+//   ```
+// -----------------------------------------------------------------------------
 
 #include <algorithm>
 
