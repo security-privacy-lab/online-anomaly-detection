@@ -22,26 +22,26 @@
 //   compute anomaly scores under a conditional‐merge regime.
 //
 // Why keep it:
-//   • Encapsulates the poisoning‐resistant logic that distinguishes MIDAS-F      \
-//   • Critical for applications where adversarial bursts could skew historical   \
-//     averages and hide future attacks                                                  \
-//   • Demonstrates how to extend the core CMS machinery with per‐entry filters \
-//   • Provides a drop-in replacement for the vanilla NormalCore when robustness \
-//     is required                                                             \
+//   • Encapsulates the poisoning‐resistant logic that distinguishes MIDAS-F      
+//   • Critical for applications where adversarial bursts could skew historical   
+//     averages and hide future attacks                                                  
+//   • Demonstrates how to extend the core CMS machinery with per‐entry filters 
+//   • Provides a drop-in replacement for the vanilla NormalCore when robustness 
+//     is required                                                             
 //
 // Key features:
-//   • ConditionalMerge: selectively merges only “normal” counts into history      \
-//   • Parameterized decay (factor) and dynamic timestamp‐based weighting         \
-//   • Separate sketches & scores for edges, sources, and destinations to capture \
-//     relational burst patterns                                                  \
+//   • ConditionalMerge: selectively merges only “normal” counts into history      
+//   • Parameterized decay (factor) and dynamic timestamp‐based weighting         
+//   • Separate sketches & scores for edges, sources, and destinations to capture 
+//     relational burst patterns                                                  
 //
 // Usage:
-//   1. Construct with:                                                         \
-//      `FilteringCore core(numHashRows, numColumns, threshold, decayFactor);`  \
-//   2. On each edge (u,v,t), call:                                             \
-//      `float score = core(u, v, t);`                                         \
-//   3. Scores above your threshold are flagged as anomalies; scores and counts \
-//      remain unpolluted by filtered spikes.                                    \
+//   1. Construct with:                                                         
+//      `FilteringCore core(numHashRows, numColumns, threshold, decayFactor);`  
+//   2. On each edge (u,v,t), call:                                             
+//      `float score = core(u, v, t);`                                         
+//   3. Scores above your threshold are flagged as anomalies; scores and counts 
+//      remain unpolluted by filtered spikes.                                    
 // -----------------------------------------------------------------------------
 
 
