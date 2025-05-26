@@ -13,7 +13,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // -----------------------------------------------------------------------------
-
+// Purpose:
+//   Provides a fully self‐contained example of how to load your stream data,
+//   configure any MIDAS variant (NormalCore, FilteringCore, RelationalCore),
+//   run the online anomaly detection over a complete dataset, and output raw
+//   scores and evaluation results.
+//
+// Why keep it:
+//   • Acts as a ready‐to‐compile template for integrating MIDAS into new projects  
+//   • Shows how to set algorithm parameters and tweak sketch dimensions in code  
+//   • Demonstrates end‐to‐end data loading, execution timing, and score export  
+//   • Simplifies testing on custom datasets without modifying the core library  
+//
+// Quick usage:
+//   1. Update the `pathMeta`, `pathData`, and `pathGroundTruth` variables to point
+//      at your own files.
+//   2. Uncomment the `MIDAS::…Core` line for the variant you want to run.
+//   3. Build & run with your usual CMake + Ninja (or MSBuild) workflow.
+//      Scores will be written to `temp/Score.txt`, and the Python evaluator will
+//      compute AUC automatically.
+// -----------------------------------------------------------------------------
 #include <chrono>
 //
 #include "NormalCore.hpp"
