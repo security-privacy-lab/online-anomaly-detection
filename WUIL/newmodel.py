@@ -1,4 +1,12 @@
 #### THIRD EXAMPLE 
+# Does simple edge-level anomaly detection using node memory dynamics in the graphs. Detects the anomalous behavior between nodes as it tracks the updated memory vectors for each node
+# Calculate how much their behavior diverges over time, assign a score to each edge and higher score is suspicious interaction 
+# This cod uses normalized depth difference, normalized time lag, Z-score degree and update the memory for each node and compute the edge anomaly scores using L2 norm
+# Difference between the first example and this one is that this one separately updates the src and dst features and memory vectors are updated and then compared 
+# Does not use second deriative or hybridization, just L2 difference 
+
+# The input format is : src,dst,time,label
+
 
 import numpy as np
 from pathlib import Path
