@@ -1,5 +1,38 @@
 #### FIRST EXAMPLE 
+"""
+— Purpose —
+Tracks memory vectors for each node based on:
+  • filesystem-style path depth differences,
+  • inter-arrival times,
+  • node degree.
+Flags an edge as anomalous when the L2 distance between the two
+nodes’ updated memory vectors is large (optionally boosted by
+a second-derivative term).
 
+— Input —
+CSV file of rows:
+    src_path,dst_path,timestamp,label
+  • src_path, dst_path: arbitrary strings or file paths
+  • timestamp: integer (e.g. UNIX time)
+  • label: 0 (benign) or 1 (anomalous) [for AUC evaluation]
+
+— Output —
+Prints Hybrid ROC AUC score combining raw L2-distance scores
+and their second derivative.
+
+— How it works —
+1. Load edges, compute per-edge features (depth, time_since_last, degree).  
+2. Normalize degree by dataset mean/std.  
+3. Maintain per-node “memory vectors” (3-dim EMA with activity-based decay).  
+4. For each edge, update src/dst memory vectors and score = L2(src_mem, dst_mem).  
+5. Optionally compute a second-derivative series on those scores, blend it
+   with the base scores (85% base + 15% second-derivative).  
+6. Evaluate via roc_auc_score(labels, blended_scores).
+
+— Configurable Parameters —
+  WINDOW_SIZE, WINDOW_STRIDE, MEMORY_DIM, DECAY_TUNED, hybrid weights
+
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
