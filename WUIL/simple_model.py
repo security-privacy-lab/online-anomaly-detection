@@ -1,3 +1,15 @@
+"""
+light weight statistical anomaly detector which analyze user behavior over time, focusing on file path access patterns and timing difference 
+Based on simple online learning of averages and variance of behavior and flags as malicious if any action is deviating too far 
+Calculates the: 
+    depth_delta: how much destination path differs from the source path 
+    time_delta: time difference between the current event and last event 
+Keeps a running average and variance of depth_delta and time_delta and for new event, calculates z-scores. This code does have threshold, and if z-score exceeds the threshold, it considers the event as malicious 
+Learns only from nomral behavior 
+
+
+"""
+
 import math
 from pathlib import Path
 from sklearn.metrics import roc_auc_score
