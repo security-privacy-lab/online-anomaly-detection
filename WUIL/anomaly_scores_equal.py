@@ -1,4 +1,12 @@
 # SECOND EXAMPLE
+"""
+window-based, memory-driven unsupervised anomaly detection system for graph-like time series data. Detects anomalous shifts in node behavior over time 
+input format: src, dst, time, label 
+Uses memory-based node profiling and snapshot drifting, and second derivative is added for smoothing temporal spikes. 
+
+WINDOW BASED
+"""
+
 
 import numpy as np
 import matplotlib.pyplot as plt
