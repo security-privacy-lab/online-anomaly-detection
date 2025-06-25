@@ -1,10 +1,38 @@
 # SECOND EXAMPLE
 """
-window-based, memory-driven unsupervised anomaly detection system for graph-like time series data. Detects anomalous shifts in node behavior over time 
-input format: src, dst, time, label 
-Uses memory-based node profiling and snapshot drifting, and second derivative is added for smoothing temporal spikes. 
+— Overview —
+Window-based, memory-driven unsupervised anomaly detection system for 
+graph-like time series data. Detects **anomalous shifts in node behavior 
+over time** using evolving memory vectors and snapshot comparison.
+Enhanced with a second derivative to capture sudden changes in anomaly scores.
 
-WINDOW BASED
+— Input Format —
+CSV file with 4 comma-separated columns (no header):
+    src_node, dst_node, timestamp, label
+  • src_node and dst_node are string identifiers 
+  • timestamp is an integer 
+  • label is 0 (normal) or 1 (anomalous), used only for evaluation (AUC)
+
+— Core Mechanism —
+1. Each node maintains a memory vector encoding:
+   - Depth difference between paths
+   - Time since last activity
+   - Normalized node degree
+
+2. The edge stream is processed using a **sliding window**:
+   - For each window, memory vectors for all nodes are updated.
+   - A memory snapshot is taken.
+   - The anomaly score is computed by comparing the current snapshot to a 
+     previous one (lag steps back), using a weighted difference of memory vectors.
+
+3. Scores are enhanced using a **second derivative**, to emphasize 
+   rapid changes in behavior.
+
+4. Final hybrid score = 85% base score + 15% second derivative
+
+— Output —
+Prints:
+  • ROC AUC score of the hybrid anomaly detection
 """
 
 
