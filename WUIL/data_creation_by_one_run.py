@@ -550,7 +550,5 @@ def run():
 if __name__ == "__main__":
     try:
         run()
-        res = five_minute_injection_by_percentile(pd.DataFrame([[1, 0], [302, 0], [304, 0], [605, 0]], columns = ["Session_ID", "Label"]), [pd.DataFrame([[1, 1], [2, 1]], columns = ["Session_ID", "Label"])])
-        print(res)
     except KeyboardInterrupt:
         print(f"{YELLOW}\nKeyboard interrupt: exiting...{RESET}")
