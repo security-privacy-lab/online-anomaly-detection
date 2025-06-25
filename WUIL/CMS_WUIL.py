@@ -1,3 +1,49 @@
+"""
+— Overview —
+Processes a dataset of time-stamped source-to-destination path chains, analyzing their structural depth and access frequency.  
+Groups records in batches (default 10) and summarizes:
+  • Average source and destination path depth  
+  • Average interarrival time  
+  • Approximate frequency of source and destination depths using Count-Min Sketch (CMS)
+
+Designed for exploratory analysis or lightweight pattern profiling of filesystem or behavioral trace logs.
+
+— Input Format —
+CSV file with lines separated by the '|' delimiter (no header):
+    src_chain | dst_chain | timestamp | label
+
+Where:
+  • src_chain, dst_chain are backslash-separated strings
+  • timestamp is a float 
+  • label is 0 or 1 
+
+— Core Functionality —
+1. Parses each record, extracting:
+   - Source & destination path depth
+   - Final path component
+   - Timestamp and label
+
+2. Groups the data into fixed-size batches
+
+3. For each group:
+   - Computes average source/destination path depth
+   - Computes average interarrival time between records
+   - Uses CMS to estimate frequency of each unique source/destination depth value
+
+4. Prints a compact summary per group.
+
+— Count-Min Sketch (CMS) —
+- Provides approximate frequency estimation with sublinear space.
+- Tuned by:
+    • epsilon (accuracy tolerance)
+    • delta (confidence level)
+- Used here to track how frequently each depth appears in a group without storing all counts.
+
+— Parameters —
+  • group_size: Number of records per summary block
+  • epsilon, delta: Control CMS resolution and accuracy
+"""
+
 import math, random, collections
 from datetime import datetime
 
