@@ -1,12 +1,41 @@
 """
-light weight statistical anomaly detector which analyze user behavior over time, focusing on file path access patterns and timing difference 
-Based on simple online learning of averages and variance of behavior and flags as malicious if any action is deviating too far 
-Calculates the: 
-    depth_delta: how much destination path differs from the source path 
-    time_delta: time difference between the current event and last event 
-Keeps a running average and variance of depth_delta and time_delta and for new event, calculates z-scores. This code does have threshold, and if z-score exceeds the threshold, it considers the event as malicious 
-Learns only from nomral behavior 
+simple_model_statistical_anomaly.py
 
+— Overview —
+Lightweight statistical anomaly detector for user behavior in time-series access data.  
+Focuses on analyzing **file path access patterns** and **timing differences** to flag 
+anomalies based on statistical deviation from learned norms.
+
+— Input Format —
+CSV file with 4 columns (no header):
+    timestamp, src_node, dst_node, label
+  • timestamp: integer (e.g., UNIX time)
+  • src_node and dst_node: strings representing file paths or user resource locations
+  • label: 0 (benign) or 1 (malicious), used only for evaluation (AUC)
+
+— Core Logic —
+1. Calculates two features per event:
+   - `depth_delta`: How structurally different dst_node is from src_node
+   - `time_delta`: Time since last event
+
+2. Maintains **running averages and variances** (online statistics) for both features.
+
+3. Computes **z-scores** for each new event:
+   - If z-score exceeds a predefined threshold, the event is classified as **malicious**
+
+4. The model **only learns from normal events** (i.e., those not flagged as anomalies),
+   making it robust against early false positives and malicious drift.
+
+5. Ignores idle events where `src_node == dst_node`.
+
+— Notes —
+  • Conceptually similar to MIDAS-style temporal anomaly detectors
+  • Designed for simplicity and interpretability — fast, no dependencies beyond `Path` and `math`
+
+— Example Use Case —
+  • Monitoring file system access
+  • Detecting outlier user behavior in logins or network flows
+  • Lightweight early anomaly flagging before full model kicks in
 
 """
 
