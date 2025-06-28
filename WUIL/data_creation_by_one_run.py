@@ -408,7 +408,7 @@ def save_as_anomrank_or_f_fade(injected_dataset, filepath):
     edges_df = pd.DataFrame(edges)
 
     # Save dataset in the required format: timestamp, src_node, dst_node, label.
-    edges_df[['src_node', 'dst_node', 'timestamp','label']].to_csv(
+    edges_df[[ 'timestamp','src_node', 'dst_node','label']].to_csv(
         f'{filepath}.txt', sep=' ', header=False, index=False
     )
 
