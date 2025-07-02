@@ -1,3 +1,5 @@
 *.mov filter=lfs diff=lfs merge=lfs -text
 WUIL_Dataset/*.txt filter=lfs diff=lfs merge=lfs -text
 WUIL_Dataset/*.csv filter=lfs diff=lfs merge=lfs -text
+WUIL_Dataset/**/*.txt filter=lfs diff=lfs merge=lfs -text
+WUIL_Dataset/**/*.csv filter=lfs diff=lfs merge=lfs -text
