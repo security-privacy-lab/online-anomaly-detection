@@ -1,10 +1,10 @@
-# 📄 Attack Injection File Naming Format
+# Attack Injection File Naming Format
 
 This repository uses a structured naming format to describe injected attacks for anomaly detection evaluation. Each filename provides key information about the algorithm used, the attack scenario, the injection method, and the injection position.
 
 ---
 
-## 🧩 File Naming Convention
+## File Naming Convention
 <algorithm_type> <attack_number> <injection_method> <injection_position>.txt
 
 
@@ -29,7 +29,7 @@ position:
   anomrank_attack1_5m_61.txt
   
 
-## 🔍 Components Explained
+## Components Explained
 
 | Component             | Description                                                                 |
 |-----------------------|-----------------------------------------------------------------------------|
@@ -40,7 +40,7 @@ position:
 
 ---
 
-## 🧪 Example Interpretations
+## Example Interpretations
 
 - `anomrank_attack1_5m_61.txt`  
   → AnomRank algorithm, Attack 1 log injected as a 5-minute block at 61% through the original log.
