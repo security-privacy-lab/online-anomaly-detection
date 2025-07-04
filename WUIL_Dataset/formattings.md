@@ -46,3 +46,10 @@ position:
   → AnomRank algorithm, Attack 1 log injected as a 5-minute block at 61% through the original log.
 
 
+
+User 16: Longest benign behavior baseline 
+User 8: The longest attack1 file 
+User 7: The longest attack 2 file + longest attacker 1,2,3 combined. 
+User 1: longest attack 3 file 
+User 12: user that had most heavily sanitized log 
+
