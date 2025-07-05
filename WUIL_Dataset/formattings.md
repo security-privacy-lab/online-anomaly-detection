@@ -1,97 +1,90 @@
-# Attack Injection & Preprocessing Guide
+# Attack Injection File Naming Format
 
-This document explains:
-
-1. **Attack injection file naming conventions**
-2. **Preprocessing pipeline** for AnomRank and MIDAS
+This repository uses a structured naming format to describe injected attacks for anomaly detection evaluation. Each filename provides key information about the algorithm used, the attack scenario, the injection method, and the injection position.
 
 ---
 
-## 1. File Naming Convention
+## File Naming Convention
+<algorithm_type> <attack_number> <injection_method> <injection_position>.txt
 
-Filenames encode algorithm, attack scenario, injection method, and injection position:
 
-```
-<algorithm>_<attack#>_<method>_<position>.txt
-```
+algorithm_type:
+- The detection algorithm used
+- anomrank for Anomrank
+- midas for MIDAS
 
-* `algorithm`: `anomrank` or `midas`
-* `attack#`: `attack1`, `attack2`, `attack3`, or `combined`
-* `method`:
+attack_number: 
+- Attack log number used(eg., attack1, attack2, or attack3)
 
-  * `5m` — a single continuous 5‑minute block injected
-  * `org` — attacks appended and re‑sorted by time
-* `position`: integer 0–100 indicating the approximate percentile into the benign log where injection starts
+injection_method: 
+- **5m** for 5-minute continuous segment injection
+- **org** for organized injection
 
-**Example:**
+position:
+- approximate location of the injected segment within the original log in percentage of 0 - 100.
+- For instance, 61 means the attack was injected at 61% into the file.
 
-```
-anomrank_attack1_5m_61.txt
-```
+---
+### Example:
+  anomrank_attack1_5m_61.txt
+  
 
-→ AnomRank, using Attack1 logs in a 5‑minute block at 61% through the baseline timeline.
+## Components Explained
+
+| Component             | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| algorithm_type      | The anomaly detection algorithm used. <br>• anomrank for AnomRank <br>• midas for MIDAS |
+| attack#             | Attack log number used (e.g., attack1, attack2, or attack3)           |
+| injection_method    | How the attack was injected: <br>• 5m = 5-minute continuous segment <br>• org = organized/injected in segments across the log |
+| injection_position  | Approximate location in the user log (in percentage of total file length). For example, 61 means the attack was injected starting at 61% of the log. |
 
 ---
 
-## 2. Preprocessing Pipeline
+## Example Interpretations
 
-We begin with LANL logs in the WUIL format:
+- anomrank_attack1_5m_61.txt  
+  → AnomRank algorithm, Attack 1 log injected as a 5-minute block at 61% through the original log.
 
-```
-ID|Date|Time|Session_ID|Depth|Path|Label
-```
 
-and produce algorithm‑ready edge lists.
 
-### 2.1 Common Steps
+User 16: Longest benign behavior baseline 
 
-1. **Load & Label**
+User 8: The longest attack1 file 
 
-   * Read `*.txt` with `|` delimiter into pandas.
-   * Sort by `Session_ID`.
-   * Force `Label=0` for benign dataset, `Label=1` for attacker dataset.
-2. **Inject Attacks**
+User 7: The longest attack 2 file + longest attacker 1,2,3 combined. 
 
-   * **5m:** find gaps (Session\_ID jumps ≥301), inject full attack log at chosen gap.
-   * **org:** append entire attack log(s), resort by `Session_ID`.
+User 1: longest attack 3 file 
 
-### 2.2 MIDAS Preprocessing
+User 12: user that had most heavily sanitized log 
 
-MIDAS requires three files per run:
 
-* **Shape file** (`*_shape.txt`): number of edges (N).
-* **Features file** (`*_features.csv`): headerless CSV of `src,dst,timestamp`.
-* **Labels file** (`*_labels.csv`): headerless CSV of the binary labels.
+-----
 
-**Steps:**
+## File Processing(Preprocess) 
+Anomrank File has been created by the file "data_creation_by_one_run.py" inside online-anomaly-detection\WUIL\ directory. The original WUIL formatting does not suit for the MIDAS or AnomRank therefore the hashing was required
 
-1. **Edge‑List Construction:** emit `(prev_path → current_path, Session_ID, Label)` per row.
-2. **ID Remapping:** gather all unique `src`/`dst` values, map them to integers `0…M-1`.
-3. **Write Files:**
+**Midas**: The file requires 3 separate files for one run. 
+- Meta file(shape_file): the integer N, the number of the records in the dataset
+- Data file: The header-less csv format of the shape; columns being src, dst, timestamp
+- Label File: The label for the data, 0 meaning normal and 1 meaning anomalous.
+As Midas accepts the integer for the src and dst, had to hash them, and use session ID for the timestamp
 
-   * `features.csv`, `labels.csv`, and `shape.txt` as described.
+| Steps             | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| Step 1: Load the Dataset      | Loads the data set that is in ID|Date|Time|Session_ID|Depth|Path|Label and sort them by Session_ID and force label 0 on benign dataset and 1 on the malicious(attacker) datasets |
+| Step 2: Perform Injection| Inject attacks by merging the malicious rows into the benign stream using either 5-minute block(where session_ID jumps >= 301) or ordered(simply append & resort by Session_ID           |
+| Step 3:  Edge-list construction  | It sort by the Session_ID -> Path log as AnomRank |
+| Step 4: Dense ID remapping| Concatnates edges of src_node and dst_node and extract the unique values and build a python dictionary and replace the both src_node and dst_node by factor_mapping therefore node ID becomes readable by MIDAS algorithm |
+| Step 5: Write Midas File | As Preprocessing is done, we write the 3 files, in feature(src, dst, time), label(0/1) and shape(number of edge)|
 
-### 2.3 AnomRank Preprocessing
 
-AnomRank requires a single edge list file:
+**AnomRank**: The file requires 1 file for one run 
+- Each columns means: timestamp src dst label
 
-```
-<timestamp> <src_node> <dst_node> <label>
-```
-
-**Steps:**
-
-1. **Edge‑List Construction:** same as above.
-2. **Normalize Timestamps:** subtract min(`Session_ID`) and add 1 so events start at `1`.
-3. **Node Mapping:** assign each unique `Path` string an integer ID on first appearance.
-4. **Write File:** export space‑delimited `<timestamp> <src> <dst> <label>.txt`.
-
----
-
-With these edge lists in place, you can run:
-
-```bash
-./anomrank <file>.txt " " <window> <warmup> 0 0 0
-```
-
-or for MIDAS, load the three generated files per its API.
+| Steps             | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| Step 1: Load the Dataset      | Loads the data set that is in ID|Date|Time|Session_ID|Depth|Path|Label and sort them by Session_ID and force label 0 on benign dataset and 1 on the malicious(attacker) datasets |
+| Step 2: Perform Injection| Inject attacks by merging the malicious rows into the benign stream using either 5-minute block(where session_ID jumps >= 301) or ordered(simply append & resort by Session_ID           |
+| Step 3:  Make directed-edge list  | Walk through the merged log in order, keeping track of previous Path. prev_Path -> current_path, timestamp, label. If  current_Path == prev_path, it does self-loop |
+| Step 4: Normalize & remap | find the minimum Session_ID and subtract it from every session_ID therefore first event is at 1(to avoid the error by integer being too big) and Map the unique string path to a dense integer node ID as they first appear |
+| Step 5: Write AnomRank File | As Preprocessing is done, we write the file in output format <timestamp><src_node><dst_node><label>|
