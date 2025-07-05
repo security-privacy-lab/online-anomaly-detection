@@ -74,7 +74,7 @@ As Midas accepts the integer for the src and dst, had to hash them, and use sess
 | Step 1: Load the Dataset      | Loads the data set that is in ID|Date|Time|Session_ID|Depth|Path|Label and sort them by Session_ID and force label 0 on benign dataset and 1 on the malicious(attacker) datasets |
 | Step 2: Perform Injection| Inject attacks by merging the malicious rows into the benign stream using either 5-minute block(where session_ID jumps >= 301) or ordered(simply append & resort by Session_ID           |
 | Step 3:  Edge-list construction  | It sort by the Session_ID -> Path log as AnomRank |
-| Step 4: Dense ID remapping| Concatnates edges of src_node and dst_node and extract the unique values and build a python dictionary and replace the both src_node and dst_node by factor_mapping therefore node ID becomes readable by MIDAS algorithm |
+| Step 4: Dense ID remapping| Concatenates edges of src_node and dst_node and extract the unique values and build a python dictionary and replace the both src_node and dst_node by factor_mapping therefore node ID becomes readable by MIDAS algorithm |
 | Step 5: Write Midas File | As Preprocessing is done, we write the 3 files, in feature(src, dst, time), label(0/1) and shape(number of edge)|
 
 
