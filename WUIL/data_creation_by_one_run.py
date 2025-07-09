@@ -223,6 +223,51 @@ def five_minute_injection_by_percentile(benign_dataset, malicious_dataset):
 
     print("Malicious logs successfully injected.")
     return injected_dataset
+def five_minute_injection_continuous(benign_dataset, malicious_dataset):
+    """
+    Like five_minute_injection, but overrides the malicious rows'
+    Session_ID to be continuous integers (no jumps or backward moves).
+    """
+    if not isinstance(malicious_dataset, list):
+        malicious_dataset = [malicious_dataset]
+    injected_dataset = benign_dataset.copy()
+
+    # find gaps of ≥301 in Session_ID
+    diff = injected_dataset['Session_ID'].astype(int).diff(-1).abs()
+    gap_indexes = diff[diff >= 301].index.tolist()
+    if not gap_indexes:
+        raise Exception("No suitable 5-minute gaps found.")
+
+    # simple quartile grouping reuse if you like, or just show the raw list:
+    while malicious_dataset:
+        print(f"Available gap indexes: {gap_indexes}")
+        idx = int(input("Choose gap index to inject at: "))
+        if idx not in gap_indexes:
+            print("Invalid index, try again."); continue
+
+        # pop one malicious chunk
+        mal = malicious_dataset.pop(0).copy()
+        start_ts = int(injected_dataset.loc[idx, "Session_ID"])
+        # override to be strictly consecutive
+        mal["Session_ID"] = list(range(start_ts + 1,
+                                        start_ts + 1 + len(mal)))
+
+        # inject
+        injected_dataset = pd.concat([
+            injected_dataset.iloc[:idx+1],
+            mal,
+            injected_dataset.iloc[idx+1:]
+        ]).reset_index(drop=True)
+
+        # shift remaining gap indexes forward by len(mal)
+        gap_indexes = [
+            i + len(mal) if i > idx else i
+            for i in gap_indexes
+            if i != idx
+        ]
+
+    print("Injection complete (continuous timestamps).")
+    return injected_dataset
 
 def random_injection(benign_dataset, malicious_dataset):
     """Injects malicious logs randomly into the dataset."""
@@ -457,9 +502,10 @@ def run():
     awaiting_response = True
     # Make choices
     while awaiting_response:
-        choice = input(f"Choose injection method: {CYAN}rj{RESET} (random), {CYAN}5m{RESET} (5-minute block), or {CYAN}or{RESET} (organized): ")
+        choice = input(f"Choose injection method: {CYAN}rj{RESET} (random), {CYAN}5m{RESET} (5-minute batch), {CYAN}5mc{RESET} (5-minute continuous), or {CYAN}or{RESET} (organized): ")
+
         
-        if choice in ['rj', '5m', 'or']:
+        if choice in ['rj', '5m', 'or', '5mc']:
             while True:
                 try:
                     num_logs = int(input("How many malicious files do you want to inject? : "))
@@ -485,7 +531,9 @@ def run():
                 injected_dataset = five_minute_injection(benign_dataset, malicious_datasets)
             elif choice == 'or':
                 injected_dataset = organized_injection(benign_dataset, malicious_datasets)
-            
+            elif choice == '5mc':
+                injected_dataset = five_minute_injection_continuous(benign_dataset, malicious_datasets)
+
             print(f"{GREEN}Original Dataset Length: {len(benign_dataset)}{RESET}")
             print(f'{GREEN}Injected Dataset Length: {len(injected_dataset)}{RESET}')
             awaiting_response = False
