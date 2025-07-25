@@ -3,7 +3,6 @@
 *.png
 *.pdf
 tmp/
-*.txt
 *swp*
 *.sw?
 gcn_back
