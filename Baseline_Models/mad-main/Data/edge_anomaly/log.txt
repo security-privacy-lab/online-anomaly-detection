@@ -1,0 +1,24 @@
+--- Densification Done. Processed synthetic dataset ---
+Num query edges:  28
+Num anomalous edges added:  411
+--- Sparsification Done. Processed synthetic dataset ---
+Num query edges:  23
+Num anomalous edges added:  657
+--- Densification Done. Processed hospital dataset ---
+Num query edges:  22
+Num anomalous edges added:  128
+--- Sparsification Done. Processed hospital dataset ---
+Num query edges:  25
+Num anomalous edges added:  135
+--- Densification Done. Processed emails dataset ---
+Num query edges:  4
+Num anomalous edges added:  8
+--- Sparsification Done. Processed emails dataset ---
+Num query edges:  8
+Num anomalous edges added:  38
+--- Densification Done. Processed traffic dataset ---
+Num query edges:  21
+Num anomalous edges added:  805
+--- Sparsification Done. Processed traffic dataset ---
+Num query edges:  25
+Num anomalous edges added:  453

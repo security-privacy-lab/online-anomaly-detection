@@ -1,0 +1,28 @@
+--- Densification and Sparsification Done. Processed synthetic dataset ---
+Num of anomalous timestamps:  100
+Num anomalous triplets for densification:  250
+Num anomalous triplets for sparsification:  250
+--- Rewiring Done. Processed synthetic dataset ---
+Num of anomalous timestamps:  50
+Num anomalous triplets:  500
+--- Densification and Sparsification Done. Processed hospital dataset ---
+Num of anomalous timestamps:  188
+Num anomalous triplets for densification:  470
+Num anomalous triplets for sparsification:  470
+--- Rewiring Done. Processed hospital dataset ---
+Num of anomalous timestamps:  94
+Num anomalous triplets:  600
+--- Densification and Sparsification Done. Processed emails dataset ---
+Num of anomalous timestamps:  246
+Num anomalous triplets for densification:  615
+Num anomalous triplets for sparsification:  615
+--- Rewiring Done. Processed emails dataset ---
+Num of anomalous timestamps:  123
+Num anomalous triplets:  504
+--- Densification and Sparsification Done. Processed traffic dataset ---
+Num of anomalous timestamps:  141
+Num anomalous triplets for densification:  355
+Num anomalous triplets for sparsification:  355
+--- Rewiring Done. Processed traffic dataset ---
+Num of anomalous timestamps:  71
+Num anomalous triplets:  710

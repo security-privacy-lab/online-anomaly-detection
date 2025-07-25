@@ -1,0 +1,28 @@
+--- Densification and Sparsification Done. Processed synthetic dataset ---
+Num query nodes:  9
+Num anomalous triplets for densification:  2996
+Num anomalous triplets for sparsification:  2716
+--- Rewiring Done. Processed synthetic dataset ---
+Num query nodes:  9
+Num of rewired triplets:  10198
+--- Densification and Sparsification Done. Processed hospital dataset ---
+Num query nodes:  10
+Num anomalous triplets for densification:  1712
+Num anomalous triplets for sparsification:  1149
+--- Rewiring Done. Processed hospital dataset ---
+Num query nodes:  9
+Num of rewired triplets:  1254
+--- Densification and Sparsification Done. Processed emails dataset ---
+Num query nodes:  2
+Num anomalous triplets for densification:  156
+Num anomalous triplets for sparsification:  156
+--- Rewiring Done. Processed emails dataset ---
+Num query nodes:  2
+Num of rewired triplets:  54
+--- Densification and Sparsification Done. Processed traffic dataset ---
+Num query nodes:  4
+Num anomalous triplets for densification:  163
+Num anomalous triplets for sparsification:  93
+--- Rewiring Done. Processed traffic dataset ---
+Num query nodes:  3
+Num of rewired triplets:  100
