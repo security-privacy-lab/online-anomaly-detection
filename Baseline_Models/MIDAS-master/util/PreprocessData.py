@@ -13,26 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------
-#
-# Purpose:
-#   Loads the raw DARPA CSV stream, normalizes node & timestamp encodings,
-#   and splits it into the three MIDAS‐ready files:
-#     • darpa_processed.csv   ← [src,dst,ts] for streaming input  
-#     • darpa_ground_truth.csv ← [0|1] labels per record  
-#     • darpa_shape.txt       ← single line with total record count  
-#
-# Why keep it:
-#   • Automates the one‐time data munging required before running MIDAS  
-#   • Ensures reproducibility: everyone uses the same encoding & time‐bin logic  
-#   • Serves as a template if you need to preprocess other streams in the same way  
-#
-# Usage:
-#   1. Place your raw DARPA CSV at `data/DARPA/darpa_original.csv`  
-#   2. Run:
-#        python util/PreprocessData.py  
-#   3. The three MIDAS‐format files will be written under `data/DARPA/`  
-# ------------------------------------------------------------------------------
 
 from pathlib import Path
 

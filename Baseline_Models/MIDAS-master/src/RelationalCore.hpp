@@ -13,32 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // -----------------------------------------------------------------------------
-// Purpose:
-//   Implements the MIDAS-R (relational) variant by extending the core sketching
-//   algorithm to capture bursts not only on individual edges but also on all
-//   edges incident to a source or destination node. Maintains three pairs of
-//   Count–Min Sketches (edge, source, destination) for current and total counts.
-//
-// Why keep it:
-//   • Provides enhanced detection of coordinated or relational anomalies that
-//     span multiple edges around a node  
-//   • Serves as the reference implementation for the AAAI 2020 “MIDAS-R” method  
-//   • Demonstrates how to integrate multi‐sketch scoring in a single core  
-//   • Allows easy comparison against NormalCore and FilteringCore in experiments  
-//
-// Key features:
-//   • Separate sketch pairs for edges, sources, and destinations  
-//   • Exponential decay of current‐tick counts via a user‐specified factor  
-//   • Computes final score as the maximum deviation across all three sketches  
-//   • O(r × d) memory and O(r) time per edge, independent of graph size  
-//
-// Usage:
-//   1. Construct with desired sketch dimensions and decay factor, e.g.  
-//        `RelationalCore core(numRows, numCols, decayFactor);`  
-//   2. For each incoming edge (u, v, t), call:  
-//        `float score = core(u, v, t);`  
-//   3. Scores above your chosen threshold indicate relational bursts/anomalies.
-// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <cmath>

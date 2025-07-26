@@ -14,32 +14,6 @@
 // limitations under the License.
 // -----------------------------------------------------------------------------
 
-// Purpose:
-//   Implements a fixed-size, hash-based count‐min sketch data structure used by
-//   all MIDAS cores to maintain approximate counts of edge occurrences in 
-//   constant time and space. Provides methods to hash keys, increment counters,
-//   query minimum counts, and merge/reset sketches.
-//
-// Why keep it:
-//   • Core dependency for every MIDAS variant (Normal, Filtering, Relational)  
-//   • Encapsulates all CMS logic in one reusable, well‐tested class  
-//   • Ensures O(r × d) memory bounds—critical for streaming performance  
-//   • Decouples sketch implementation from anomaly-scoring logic  
-//
-// Key features:
-//   • Parameterized rows (r) and columns (c) for tunable accuracy vs. memory  
-//   • Randomized hash parameters for low collision bias  
-//   • ClearAll/MultiplyAll to support decay or resets  
-//   • Copy‐constructor for safe duplication of sketch state  
-//
-// Usage:
-//   1. Construct with desired dimensions: `CountMinSketch sketch(r, c);`  
-//   2. For each key, call `sketch.Hash(idxArr, a, b)` then  
-//      `sketch.Add(idxArr)` or `query = sketch(idxArr);`  
-//   3. Merge/reset between time ticks as needed in your core code.
-// -----------------------------------------------------------------------------
-
-
 #pragma once
 
 #include <algorithm>

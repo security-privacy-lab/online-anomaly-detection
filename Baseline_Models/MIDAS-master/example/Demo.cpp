@@ -28,9 +28,9 @@ int main(int argc, char* argv[]) {
 	// Parameter
 	// --------------------------------------------------------------------------------
 
-	const auto pathMeta = SOLUTION_DIR"data/midas_user1_or_all_shape.txt";
-	const auto pathData = SOLUTION_DIR"data/midas_user1_or_all_features.csv";
-	const auto pathLabel = SOLUTION_DIR"data/midas_user1_or_all_labels.csv";
+	const auto pathMeta = SOLUTION_DIR"data/user1_midas_attack3_or_shape.txt";
+	const auto pathData = SOLUTION_DIR"data/user1_midas_attack3_or_features.csv";
+	const auto pathLabel = SOLUTION_DIR"data/user1_midas_attack3_or_labels.csv";
 
 	// Random seed
 	// --------------------------------------------------------------------------------

@@ -13,31 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // -----------------------------------------------------------------------------
-// -----------------------------------------------------------------------------
-// Purpose:
-//   Implements the original MIDAS core algorithm (no filtering or relational
-//   extensions). Maintains two Count–Min Sketches—one for the current time tick
-//   and one for the cumulative history—to score edge bursts as anomalies.
-//
-// Why keep it:
-//   • Provides the baseline MIDAS behavior for comparison against MIDAS-F and MIDAS-R  
-//   • Encapsulates the simplest, constant‐time/constant‐space anomaly detector  
-//   • Serves as a reference implementation for understanding the core scoring logic  
-//   • Lightweight and easy to integrate when you do not need poisoning resistance  
-//
-// Key features:
-//   • Two CMS instances (current vs. total) for fast streaming updates  
-//   • O(r × d) memory and O(r) per‐edge operations, independent of graph size  
-//   • Poisson‐inspired scoring: flags edges whose current‐tick count deviates  
-//     significantly from historical averages  
-//
-// Usage:
-//   1. Construct with your sketch dimensions, e.g.:  
-//        `NormalCore core(numHashRows, numColumns);`  
-//   2. For each incoming edge (u, v, t), call:  
-//        `float score = core(u, v, t);`  
-//   3. Scores above your chosen threshold indicate abnormal bursts.  
-// -----------------------------------------------------------------------------
 
 #pragma once
 

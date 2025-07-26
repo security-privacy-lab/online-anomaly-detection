@@ -14,26 +14,6 @@
 // limitations under the License.
 // -----------------------------------------------------------------------------
 
-// -----------------------------------------------------------------------------
-// Experiment.cpp
-//
-// Purpose:
-//   Provides a reusable harness to benchmark and evaluate all MIDAS variants
-//   (NormalCore, FilteringCore, RelationalCore) across multiple settings.
-//   Automates parameter sweeps (thresholds, number of columns, record counts,
-//   etc.), computes AUC or timing metrics for each run, and writes results
-//   out in CSV or score/text form for downstream analysis.
-//
-// Why keep it:
-//   • Enables reproducible, automated experiments without manual reruns  
-//   • Serves as a template if you ever need new sweeps or comparison plots  
-//   • Keeps evaluation logic decoupled from the core library/demo code  
-//
-// Usage:
-//   1. Uncomment the desired experiment call in main()  
-//   2. Build & run; results land in temp/Experiment.csv or Score*/AUC* files  
-// -----------------------------------------------------------------------------
-
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
