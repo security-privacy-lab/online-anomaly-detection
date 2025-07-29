@@ -223,6 +223,7 @@ def five_minute_injection_by_percentile(benign_dataset, malicious_dataset):
 
     print("Malicious logs successfully injected.")
     return injected_dataset
+
 def five_minute_injection_continuous(benign_dataset, malicious_dataset):
     """
     Like five_minute_injection, but overrides the malicious rows'
@@ -249,9 +250,10 @@ def five_minute_injection_continuous(benign_dataset, malicious_dataset):
         mal = malicious_dataset.pop(0).copy()
         start_ts = int(injected_dataset.loc[idx, "Session_ID"])
         # override to be strictly consecutive
-        mal["Session_ID"] = list(range(start_ts + 1,
-                                        start_ts + 1 + len(mal)))
-
+        original_sids = mal["Session_ID"].astype(int)
+        unique_sids = original_sids.drop_duplicates().reset_index(drop=True)
+        sid_mapping = {sid: start_ts + 1 + i for i, sid in enumerate(unique_sids)}
+        mal["Session_ID"] = original_sids.map(sid_mapping)
         # inject
         injected_dataset = pd.concat([
             injected_dataset.iloc[:idx+1],
