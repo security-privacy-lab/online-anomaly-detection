@@ -1,0 +1,14 @@
+{
+  "dataset": "./data/user12_anomrank_combined_5mc.txt",
+  "embedding_size": 200,
+  "batch_size": 32,
+  "t_setup": 8000,
+  "W_upd": 720,
+  "alpha": 0.999,
+  "T_th": 120,
+  "epochs": 5,
+  "online_train_steps": 10,
+  "gpu": 0,
+  "M": 100,
+  "model_dir": "./result/"
+}
