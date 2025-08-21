@@ -1,40 +1,45 @@
 #include <vector>
-#include <algorithm>
-#include <numeric>
 #include <iostream>
+#include <numeric>      // Required for std::iota
+#include <algorithm>    // Required for std::sort
+#include <ostream>      // Required for std::ostream
 
-void compute_accuracy(double* as, bool* attack, int timeNum, int topN, double &precision, double &recall) {
-    std::vector<int> idx(timeNum);
+// A struct to hold the results of our calculation
+struct AccuracyResult
+{
+    double precision;
+    double recall;
+};
+
+AccuracyResult compute_accuracy(double* as, bool* attack, int timeNum, int topN)
+{
+    int tp, fp, tn, fn;
+    tp = fp = tn = fn = 0;
+    std::vector<size_t> idx(timeNum);
     std::iota(idx.begin(), idx.end(), 0);
 
-    // Sort indices based on anomaly scores
-    std::sort(idx.begin(), idx.end(), [as](int i1, int i2) {
-        return as[i1] > as[i2];
-    });
+    std::sort(idx.begin(), idx.end(), [&as](size_t i1, size_t i2) {return as[i1] > as[i2];});
 
-    int truePositives = 0;
-    int falsePositives = 0;
-    int actualAnomalies = 0;
+    for(int i = 0; i < topN; i++)
+    {
+        if(attack[idx[i]])
+            tp++;
+        else
+            fp++;
+	}
 
-    // Count actual anomalies in the data
-    for (int i = 0; i < timeNum; ++i) {
-        if (attack[i]) {
-            actualAnomalies++;
-        }
+    for(int i = topN; i < timeNum; i++)
+    {
+        if(attack[idx[i]])
+            fn++;
+        else
+            tn++;
     }
 
-    // Calculate true positives and false positives for topN results
-    for (int i = 0; i < topN; ++i) {
-        if (attack[idx[i]]) {
-            truePositives++;
-        } else {
-            falsePositives++;
-        }
-    }
-
-    precision = (topN > 0) ? static_cast<double>(truePositives) / topN : 0.0;
-    recall = (actualAnomalies > 0) ? static_cast<double>(truePositives) / actualAnomalies : 0.0;
-
-    // Commented out to prevent duplicate output:
-    // std::cout << "Top " << topN << " - Precision: " << precision << ", Recall: " << recall << std::endl;
+    AccuracyResult result;
+    result.precision = (tp + fp == 0) ? 0 : double(tp)/(tp+fp);
+    result.recall = (tp + fn == 0) ? 0 : double(tp)/(tp+fn);
+    
+    // Return the result object
+    return result;
 }
