@@ -2,9 +2,19 @@ import os
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import auc, roc_auc_score
+from sklearn.metrics import auc, roc_auc_score, precision_recall_curve, average_precision_score
+import numpy as np
 
-# Parse the precision/recall text file
+scores, labels = np.loadtxt("darpa_anomrank_result.txt").T
+prec, rec, _ = precision_recall_curve(labels, scores)   
+ap = average_precision_score(labels, scores)
+
+plt.plot(rec, prec)
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title(f'PR Curve (AUC = {ap:.3f})')
+
+print("PR-AUC (Average Precision):", ap)
 file_path = 'darpa_precision_recall.txt'
 rows = []
 with open(file_path, 'r') as f:
@@ -28,11 +38,6 @@ plt.title("Precision vs Recall for Different Top-N Values")
 plt.grid(True)
 plt.legend()
 plt.show()
-
-# Calculate AUC using Precision–Recall curve
-df.sort_values(by="Recall")
-pr_auc = auc(df["Recall"], df["Precision"])
-print(f"Precision–Recall AUC (from given points): {pr_auc:.4f}")
 
 #This part of the code is for only if you want to have AUC score using anomaly scores and label
 '''
