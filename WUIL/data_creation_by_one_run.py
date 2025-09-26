@@ -224,52 +224,116 @@ def five_minute_injection_by_percentile(benign_dataset, malicious_dataset):
     print("Malicious logs successfully injected.")
     return injected_dataset
 
-def five_minute_injection_continuous(benign_dataset, malicious_dataset):
+def five_minute_injection_continuous_improved(benign_dataset, malicious_dataset, enforce_shift=True):
     """
-    Like five_minute_injection, but overrides the malicious rows'
-    Session_ID to be continuous integers (no jumps or backward moves).
+    Insert malicious chunks into 5-minute gaps using continuous integer Session_IDs:
+      - Each malicious chunk's Session_IDs become consecutive integers starting at gap_session_id + 1.
+      - If the malicious chunk would overlap or exceed the following benign timestamp,
+        and enforce_shift is True, all subsequent benign timestamps are shifted forward
+        to avoid overlap.
+      - Supports multiple malicious chunks (list or single DataFrame).
+    Returns the injected dataset (reset index).
     """
+    # Normalize malicious_dataset to a list of DataFrames
     if not isinstance(malicious_dataset, list):
-        malicious_dataset = [malicious_dataset]
-    injected_dataset = benign_dataset.copy()
+        malicious_dataset = [malicious_dataset.copy()]
+    else:
+        malicious_dataset = [m.copy() for m in malicious_dataset]
 
-    # find gaps of ≥301 in Session_ID
+    injected_dataset = benign_dataset.copy().reset_index(drop=True)
+
+    # find gaps of >=301 between consecutive Session_ID
     diff = injected_dataset['Session_ID'].astype(int).diff(-1).abs()
     gap_indexes = diff[diff >= 301].index.tolist()
     if not gap_indexes:
         raise Exception("No suitable 5-minute gaps found.")
 
-    # simple quartile grouping reuse if you like, or just show the raw list:
-    while malicious_dataset:
-        print(f"Available gap indexes: {gap_indexes}")
-        idx = int(input("Choose gap index to inject at: "))
-        if idx not in gap_indexes:
-            print("Invalid index, try again."); continue
+    def build_quartile_groups(gap_idxs):
+        gap_idxs_sorted = sorted(gap_idxs)
+        n = len(gap_idxs_sorted)
+        q1 = n // 4
+        q2 = n // 2
+        q3 = (3 * n) // 4
+        return {
+            "0-25%": gap_idxs_sorted[:q1],
+            "25-50%": gap_idxs_sorted[q1:q2],
+            "50-75%": gap_idxs_sorted[q2:q3],
+            "75-100%": gap_idxs_sorted[q3:]
+        }
 
-        # pop one malicious chunk
-        mal = malicious_dataset.pop(0).copy()
+    quartile_groups = build_quartile_groups(gap_indexes)
+
+    while malicious_dataset:
+        print(f"\nAvailable gap indexes: {gap_indexes}")
+        try:
+            idx = int(input("Choose gap index to inject at: "))
+        except ValueError:
+            print("Invalid input; please enter an integer index.")
+            continue
+
+        if idx not in gap_indexes:
+            print("Invalid index; choose from the available gap_indexes.")
+            continue
+
+        # Pop one malicious chunk and copy it
+        mal = malicious_dataset.pop(0).copy().reset_index(drop=True)
+        mal_len = len(mal)
+
+        # Determine new consecutive timestamps starting at start_ts+1
         start_ts = int(injected_dataset.loc[idx, "Session_ID"])
-        # override to be strictly consecutive
-        original_sids = mal["Session_ID"].astype(int)
-        unique_sids = original_sids.drop_duplicates().reset_index(drop=True)
-        sid_mapping = {sid: start_ts + 1 + i for i, sid in enumerate(unique_sids)}
-        mal["Session_ID"] = original_sids.map(sid_mapping)
-        # inject
+        new_start = start_ts + 1
+        new_mal_ts = list(range(new_start, new_start + mal_len))
+        mal['Session_ID'] = new_mal_ts
+
+        # Determine next existing timestamp (after insertion spot) if any
+        next_existing_idx = idx + 1
+        if next_existing_idx < len(injected_dataset):
+            next_existing_ts = int(injected_dataset.loc[next_existing_idx, 'Session_ID'])
+        else:
+            next_existing_ts = None
+
+        # If overlap would occur, compute shift needed
+        shift_amount = 0
+        if next_existing_ts is not None:
+            last_mal_ts = new_mal_ts[-1]
+            if last_mal_ts >= next_existing_ts:
+                shift_amount = last_mal_ts - next_existing_ts + 1
+
+        # Insert the malicious chunk
         injected_dataset = pd.concat([
             injected_dataset.iloc[:idx+1],
             mal,
             injected_dataset.iloc[idx+1:]
         ]).reset_index(drop=True)
 
-        # shift remaining gap indexes forward by len(mal)
-        gap_indexes = [
-            i + len(mal) if i > idx else i
-            for i in gap_indexes
-            if i != idx
-        ]
+        # If shift required and allowed, shift subsequent rows
+        if shift_amount > 0 and enforce_shift:
+            # The start index of rows to shift is idx + len(mal) + 1
+            shift_start = idx + len(mal) + 1
+            if shift_start < len(injected_dataset):
+                injected_dataset.loc[shift_start:, 'Session_ID'] = (
+                    injected_dataset.loc[shift_start:, 'Session_ID'].astype(int) + shift_amount
+                )
+            print(f"Inserted {mal_len} rows at index {idx}; shifted subsequent rows by {shift_amount}.")
 
-    print("Injection complete (continuous timestamps).")
+        else:
+            print(f"Inserted {mal_len} rows at index {idx}; no shift needed.")
+
+        # Safety pass: enforce strictly increasing Session_IDs (each >= prev + 1)
+        sess = injected_dataset['Session_ID'].astype(int).to_numpy()
+        for i in range(1, len(sess)):
+            if sess[i] <= sess[i-1]:
+                sess[i] = sess[i-1] + 1
+        injected_dataset['Session_ID'] = sess
+
+        # Recompute gap indexes and quartiles for further injections
+        diff = injected_dataset['Session_ID'].astype(int).diff(-1).abs()
+        gap_indexes = diff[diff >= 301].index.tolist()
+        quartile_groups = build_quartile_groups(gap_indexes)
+
+    print("Injection complete (continuous timestamps enforced).")
     return injected_dataset
+
 
 def random_injection(benign_dataset, malicious_dataset):
     """Injects malicious logs randomly into the dataset."""
@@ -484,6 +548,179 @@ def save_as_midas(edges_df, filepath):
 
     with open(f"{filepath}_shape.txt", "w") as f:
         f.write(f"{edges_df.shape[0]}")
+def save_as_SLADE(injected_dataset, dataset_name):
+    os.makedirs("data", exist_ok=True)
+
+    edges = []
+    node_mapping = {}
+    next_id = 1  # Start from 1 (0 is reserved for padding in SLADE/TGN)
+
+    def get_node_id(path_str):
+        nonlocal next_id
+        if path_str not in node_mapping:
+            node_mapping[path_str] = next_id
+            next_id += 1
+        return node_mapping[path_str]
+
+    # Find the minimum timestamp for normalization
+    min_ts = int(injected_dataset["Session_ID"].min())
+
+    prev_path = None
+    for _, row in injected_dataset.iterrows():
+        cur_path = row["Path"]
+        ts = int(row["Session_ID"])
+        lab = int(row["Label"])
+
+        # Normalize timestamp to start at 1
+        norm_ts = ts - min_ts + 1
+
+        cur_id = get_node_id(cur_path)
+
+        if prev_path is None:
+            prev_path = cur_path
+            continue
+
+        prev_id = get_node_id(prev_path)
+
+        # Create an edge between previous and current path
+        edges.append({
+            "u": prev_id,
+            "i": cur_id,
+            "ts": norm_ts,
+            "label": lab
+        })
+
+        prev_path = cur_path
+
+    if not edges:
+        print("No edges to save for SLADE.")
+        return
+
+    # Convert to DataFrame
+    df = pd.DataFrame(edges, columns=["u", "i", "ts", "label"]).astype(int)
+
+    # Sort edges by timestamp to ensure chronological order
+    df = df.sort_values("ts").reset_index(drop=True)
+
+    # Assign unique edge indices after sorting
+    df["idx"] = df.index.astype(int)
+
+    # Save dataset in SLADE format
+    out_path = f"data/ml_{dataset_name}.csv"
+    df[["u", "i", "ts", "label", "idx"]].to_csv(out_path, index=False, header=True)
+    print(f"{GREEN}SLADE file saved → {out_path}{RESET}")
+
+
+def save_as_SLADE_tail_time_only(
+    injected_dataset,
+    dataset_name,
+    pad_ticks=300,
+    step=1,
+    pad_label=0,
+    fill_internal_gaps=True
+):
+    """
+    Save in SLADE/TGN format with:
+      - node IDs starting at 1,
+      - timestamps normalized to start at 1,
+      - optional internal idle filling per (u, i) pair,
+      - tail padding (self-loops on the last node).
+    Output columns: u, i, ts, label, idx
+    """
+    os.makedirs("data", exist_ok=True)
+
+    edges = []
+    node_mapping = {}
+    next_id = 1  # Start node IDs from 1 (0 is reserved for padding in SLADE/TGN)
+
+    def get_node_id(path_str):
+        """Map each unique path to a unique integer node ID (starting from 1)."""
+        nonlocal next_id
+        if path_str not in node_mapping:
+            node_mapping[path_str] = next_id
+            next_id += 1
+        return node_mapping[path_str]
+
+    # Base timestamp normalization anchor
+    min_ts = int(injected_dataset["Session_ID"].min())
+
+    prev_path = None
+    last_norm_ts = 0
+    last_node_id = None
+
+    # 1) Build base edges from the dataset (Path sequence -> edges)
+    for _, row in injected_dataset.iterrows():
+        cur_path = row["Path"]
+        ts = int(row["Session_ID"])
+        lab = int(row["Label"])
+        norm_ts = ts - min_ts + 1  # normalize to start at 1
+
+        cur_id = get_node_id(cur_path)
+
+        if prev_path is None:
+            # Skip the very first row (no previous node to connect from)
+            prev_path = cur_path
+            last_norm_ts = norm_ts
+            last_node_id = cur_id
+            continue
+
+        prev_id = get_node_id(prev_path)
+
+        edges.append({
+            "u": prev_id,
+            "i": cur_id,
+            "ts": norm_ts,
+            "label": lab
+        })
+
+        prev_path = cur_path
+        last_norm_ts = norm_ts
+        last_node_id = cur_id
+
+    if not edges:
+        print("No edges to save for SLADE (time-only).")
+        return
+
+    import pandas as pd
+    df = pd.DataFrame(edges, columns=["u", "i", "ts", "label"]).astype(int)
+
+    # 2) (Optional) Fill internal idle gaps per (u, i) pair
+    if fill_internal_gaps:
+        # Sort by pair then time to detect gaps
+        df = df.sort_values(["u", "i", "ts"]).reset_index(drop=True)
+
+        filler_rows = []
+        # Iterate consecutive timestamps for each (u, i) group
+        for (u, i), g in df.groupby(["u", "i"], sort=False):
+            ts_vals = g["ts"].values
+            # Walk through successive events for this pair
+            for prev_ts, next_ts in zip(ts_vals[:-1], ts_vals[1:]):
+                gap = next_ts - prev_ts
+                if gap > step:
+                    # Add idle edges at prev_ts + step, ..., next_ts - step
+                    for t in range(prev_ts + step, next_ts, step):
+                        filler_rows.append({"u": u, "i": i, "ts": t, "label": int(pad_label)})
+
+        if filler_rows:
+            df = pd.concat([df, pd.DataFrame(filler_rows)], ignore_index=True).astype(int)
+
+    # 3) Tail padding (self-loops on the last node) to extend timeline
+    if pad_ticks > 0 and last_node_id is not None:
+        tail_rows = [{"u": last_node_id,
+                      "i": last_node_id,
+                      "ts": last_norm_ts + step * k,
+                      "label": int(pad_label)}
+                     for k in range(1, pad_ticks + 1)]
+        df = pd.concat([df, pd.DataFrame(tail_rows)], ignore_index=True).astype(int)
+
+    # 4) Final sort by time (global chronological order) and assign idx
+    df = df.sort_values("ts").reset_index(drop=True)
+    df["idx"] = df.index.astype(int)
+
+    # 5) Save in SLADE format
+    out_path = f"data/ml_{dataset_name}_timepad.csv"
+    df[["u", "i", "ts", "label", "idx"]].to_csv(out_path, index=False, header=True)
+    print(f"{GREEN}SLADE time-only file saved → {out_path}{RESET}")
 
 def run():
 
@@ -534,7 +771,7 @@ def run():
             elif choice == 'or':
                 injected_dataset = organized_injection(benign_dataset, malicious_datasets)
             elif choice == '5mc':
-                injected_dataset = five_minute_injection_continuous(benign_dataset, malicious_datasets)
+                injected_dataset = five_minute_injection_continuous_improved(benign_dataset, malicious_datasets)
 
             print(f"{GREEN}Original Dataset Length: {len(benign_dataset)}{RESET}")
             print(f'{GREEN}Injected Dataset Length: {len(injected_dataset)}{RESET}')
@@ -564,7 +801,9 @@ def run():
     2. {CYAN}Sedanspot{RESET}
     3. {CYAN}MAD{RESET}
     4. {CYAN}MIDAS{RESET}
-    5. Customize
+    5. {CYAN}Customize{RESET}
+    6. {CYAN} SLADE{RESET}
+    7. {CYAN} SLADE (time-only){RESET} (adds self-edges at the end with incrementing timestamps)
     """)
 
 
@@ -593,6 +832,13 @@ def run():
         elif file_type == '5':
             customize_saving_method(edges_df, filepath)
             awaiting_response = False
+        elif file_type == '6':
+            save_as_SLADE(injected_dataset, filename)
+            awaiting_response = False
+        elif file_type == '7':
+            save_as_SLADE_tail_time_only(injected_dataset, filename)
+            awaiting_response = False
+            
         else:
             print(f"{YELLOW}Error: Invalid choice! Please try again.{RESET}")
 
