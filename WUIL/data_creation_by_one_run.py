@@ -143,6 +143,67 @@ def five_minute_injection(benign_dataset, malicious_dataset):
     print("Malicious logs successfully injected.")
     return injected_dataset
 
+def save_as_anomrank_with_idle_padding(injected_dataset, filepath, bin_size=1, pad_label=0):
+    import pandas as pd
+
+    edges = []
+    node_map, next_id = {}, 0
+
+    def nid(p):
+        nonlocal next_id
+        if p not in node_map:
+            node_map[p] = next_id
+            next_id += 1
+        return node_map[p]
+
+    min_ts = int(injected_dataset['Session_ID'].min())
+    prev_path = None
+    prev_bin  = None
+
+    for _, row in injected_dataset.iterrows():
+        cur_path = row['Path']
+        ts       = int(row['Session_ID'])
+        label    = int(row['Label'])
+        cur_id   = nid(cur_path)
+        bin_t    = (ts - min_ts) // int(bin_size)
+
+        if prev_path is None:
+            prev_path = cur_path
+            prev_bin  = bin_t
+            continue
+
+        # --- idle padding: fill missing bins with self-loop on prev node ---
+        if bin_t - prev_bin > 1:
+            prev_id = nid(prev_path)
+            for b in range(prev_bin + 1, bin_t):
+                edges.append({
+                    'time_bin': b,
+                    'src_id'  : prev_id,
+                    'dst_id'  : prev_id,
+                    'label'   : int(pad_label)
+                })
+
+        # 실제 전이(edge)
+        prev_id = nid(prev_path)
+        edges.append({
+            'time_bin': bin_t,
+            'src_id'  : prev_id,
+            'dst_id'  : cur_id,
+            'label'   : label
+        })
+
+        prev_path = cur_path
+        prev_bin  = bin_t
+
+    if not edges:
+        print("No edges to save (idle padding).")
+        return
+
+    df = pd.DataFrame(edges, columns=['time_bin','src_id','dst_id','label']).astype(int)
+    df = df.sort_values(['time_bin','src_id','dst_id'])
+    df[['time_bin','src_id','dst_id','label']].to_csv(f'{filepath}.txt', sep=' ', header=False, index=False)
+    print(f"[AnomRank idle-padded] saved → {filepath}.txt")
+
 def five_minute_injection_by_percentile(benign_dataset, malicious_dataset):
     """
     Injects malicious logs into 5-minute gaps in session IDs and prints the starting indexes neatly.
@@ -367,19 +428,84 @@ def random_injection(benign_dataset, malicious_dataset):
     print("{GREEN}Malicious logs successfully injected at random indices.{RESET}")
     return injected_dataset
 
-def organized_injection(benign_dataset, malicious_dataset):
-    """Organizes malicious logs into the dataset in order."""
+def organized_injection(benign_dataset, malicious_dataset, sort_by_session=True):
+    """
+    benign 뒤에 악성 청크들을 붙이고 (옵션) Session_ID로 정렬.
+    - 모든 행에 source / attack_id 칼럼을 달아줌
+    - 정렬하지 않으면 각 악성 청크는 연속 블록 → (start,end) 한 쌍으로 보고
+    - 정렬하면 attack_id가 흩어질 수 있음 → 여러 (start,end) 구간으로 보고
+    반환: injected_dataset, attack_spans
+      attack_spans = { attack_id: [ (start_idx, end_idx), ... ] }  # 0-based, inclusive
+    """
+    import pandas as pd
 
-    # Correct input to type list
+    # 리스트로 통일
     if not isinstance(malicious_dataset, list):
         malicious_dataset = [malicious_dataset]
 
-    injected_dataset = benign_dataset.copy()
-    
-    for mal_data in malicious_dataset:
-        injected_dataset = pd.concat((injected_dataset, mal_data), ignore_index=True)
-        injected_dataset = injected_dataset.sort_values(by="Session_ID", ascending=True)
-    return injected_dataset
+    # 복사 및 초기 태깅
+    injected = benign_dataset.copy().reset_index(drop=True)
+    injected["source"] = "benign"
+    injected["attack_id"] = 0   # benign은 0(비공격)
+
+    attack_spans = {}
+    next_attack_id = 1
+
+    # 1) 정렬하지 않을 경우: 연속 블록 그대로 기록
+    if not sort_by_session:
+        for m in malicious_dataset:
+            m = m.copy().reset_index(drop=True)
+            m["Label"] = 1
+            m["source"] = "malicious"
+            m["attack_id"] = next_attack_id
+
+            start = len(injected)              # 붙이기 전 시작 라인(0-based)
+            injected = pd.concat([injected, m], ignore_index=True)
+            end   = len(injected) - 1          # 붙인 뒤 종료 라인(포함)
+
+            attack_spans[next_attack_id] = [(start, end)]
+            next_attack_id += 1
+
+        return injected, attack_spans
+
+    # 2) 정렬하는 경우: 먼저 다 붙이고, 정렬 후 attack_id별로 끊어진 구간을 계산
+    chunks = [injected]
+    for m in malicious_dataset:
+        m = m.copy().reset_index(drop=True)
+        m["Label"] = 1
+        m["source"] = "malicious"
+        m["attack_id"] = next_attack_id
+        chunks.append(m)
+        next_attack_id += 1
+
+    injected = pd.concat(chunks, ignore_index=True)
+
+    # Session_ID 기준 정렬 → 행 인덱스가 새로 섞임
+    injected = injected.sort_values(by="Session_ID", kind="mergesort").reset_index(drop=True)
+    # (mergesort는 안정 정렬)
+
+    # attack_id별로 연속 인덱스 구간을 계산
+    for aid, g in injected.groupby("attack_id", sort=False):
+        if aid == 0:
+            continue  # benign은 스킵
+        idxs = g.index.to_list()
+        if not idxs:
+            continue
+
+        # 연속된 인덱스 조각으로 나눠 spans 생성
+        spans = []
+        s = e = idxs[0]
+        for x in idxs[1:]:
+            if x == e + 1:
+                e = x
+            else:
+                spans.append((s, e))
+                s = e = x
+        spans.append((s, e))
+        attack_spans[aid] = spans
+
+    return injected, attack_spans
+
 
 def customize_saving_method(edges_df, filepath):
     """Allows the user to customize saving columns."""
@@ -522,7 +648,6 @@ def save_as_anomrank_or_f_fade(injected_dataset, filepath):
     edges_df[[ 'timestamp','src_node', 'dst_node','label']].to_csv(
         f'{filepath}.txt', sep=' ', header=False, index=False
     )
-
 
 def save_as_sedanspot(edges_df, filepath):
     """Saves the dataset in SedanSpot format."""
@@ -769,7 +894,12 @@ def run():
             elif choice == '5m':
                 injected_dataset = five_minute_injection(benign_dataset, malicious_datasets)
             elif choice == 'or':
-                injected_dataset = organized_injection(benign_dataset, malicious_datasets)
+                injected_dataset, attack_spans = organized_injection(benign_dataset, malicious_datasets)
+                print(f"\n=== Injection Summary ===")
+                for aid, spans in attack_spans.items():
+                    for (s, e) in spans:
+                        print(f"attack {aid}: rows {s}~{e} (count={e - s + 1})")
+
             elif choice == '5mc':
                 injected_dataset = five_minute_injection_continuous_improved(benign_dataset, malicious_datasets)
 
@@ -782,18 +912,44 @@ def run():
 
     # Make self-edging graph here
     edges = []
-    prev_path = None
-    for _, row in injected_dataset.iterrows():
-        current_path = row['Path']
-        timestamp = row['Session_ID']
-        label = row['Label']
+    prev_path  = None
+    prev_label = None
 
-        if prev_path == current_path:
-            edges.append({'src_node': current_path, 'dst_node': current_path, 'timestamp': timestamp, 'weight': 1, 'label': label})
-        elif prev_path is not None:
-            edges.append({'src_node': prev_path, 'dst_node': current_path, 'timestamp': timestamp, 'weight': 1, 'label': label})
-        
-        prev_path = current_path
+    for _, row in injected_dataset.iterrows():
+        cur_path  = row['Path']
+        timestamp = int(row['Session_ID'])
+        cur_label = int(row['Label'])  # 현재 행의 라벨
+
+        if prev_path is None:
+            prev_path  = cur_path
+            prev_label = cur_label
+            continue
+
+        # ✅ 엣지 라벨 규칙
+        edge_label = prev_label        # 소스 기준 (가장 일반적)
+
+        # ✅ 이 부분이 루프 내부에 들어가야 함
+        if prev_path == cur_path:
+            edges.append({
+                'src_node': cur_path,
+                'dst_node': cur_path,
+                'timestamp': timestamp,
+                'weight': 1,
+                'label': edge_label
+            })
+        else:
+            edges.append({
+                'src_node': prev_path,
+                'dst_node': cur_path,
+                'timestamp': timestamp,
+                'weight': 1,
+                'label': edge_label
+            })
+
+        prev_path  = cur_path
+        prev_label = cur_label
+
+    edges_df = pd.DataFrame(edges)
         
     print(f"""
     Choose file save format:
@@ -804,10 +960,11 @@ def run():
     5. {CYAN}Customize{RESET}
     6. {CYAN} SLADE{RESET}
     7. {CYAN} SLADE (time-only){RESET} (adds self-edges at the end with incrementing timestamps)
+    8. {CYAN} AnomRank with idle padding{RESET} (adds self-edges during idle periods)
     """)
 
 
-    edges_df = pd.DataFrame(edges)
+    
 
     awaiting_response = True
 
@@ -837,6 +994,9 @@ def run():
             awaiting_response = False
         elif file_type == '7':
             save_as_SLADE_tail_time_only(injected_dataset, filename)
+            awaiting_response = False
+        elif file_type == '8':
+            save_as_anomrank_with_idle_padding(injected_dataset, filepath)
             awaiting_response = False
             
         else:
