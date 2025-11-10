@@ -69,7 +69,6 @@ double compute_anomaly_score(int t, double** pagerank1, double** pagerank2, doub
     int start_i = 0;
     int end_i = 4;
 
-    // 1st & 2nd order derivatives
     double** d = new double*[4];
     for(int i = 0; i < 4; i++)
     {
@@ -112,7 +111,6 @@ double compute_anomaly_score(int t, double** pagerank1, double** pagerank2, doub
     for(int i = start_i; i < end_i; i ++)
     {
         double subscore = score_absum(d[i], n) * (total_max/max[i]);
-        // max
         score = std::max(score, subscore);
     }
 

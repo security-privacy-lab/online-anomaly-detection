@@ -25,7 +25,7 @@ void inject(outEdge* A, int u, int v, int num)
 double inject_anomaly(int scenario, outEdge* A, int n, int edgeNum)
 {
     switch(scenario){
-        case 1: // add whole weights to one edge
+        case 1:
         {
             int u;
             do{
@@ -37,7 +37,7 @@ double inject_anomaly(int scenario, outEdge* A, int n, int edgeNum)
             inject(A, u, v, edgeNum);
             return edgeNum;
         }
-        case 2: // distribute whole weights to out-edges
+        case 2:
         {
             int u;
             do{
@@ -59,7 +59,7 @@ double inject_anomaly(int scenario, outEdge* A, int n, int edgeNum)
             }
             return edgeNum;
         }
-        case 3: // distribute whole edges to unseen edges from one source
+        case 3:
         {
             int u = std::rand()%n;
             int* v = new int[edgeNum];

@@ -1,7 +1,6 @@
-// ===== accuracy.cpp =====
 #include <vector>
 #include <algorithm>
-#include <numeric>   // for std::iota
+#include <numeric>
 #include <iostream>
 #include <cmath>
 
@@ -9,8 +8,8 @@ struct AccuracyResult {
     double precision;
     double recall;
     double f1;
-    double tpr;  // true positive rate (same as recall)
-    double fpr;  // false positive rate
+    double tpr;
+    double fpr;
 };
 
 AccuracyResult compute_accuracy(double* as, bool* attack, int timeNum, int topN)
@@ -29,7 +28,6 @@ AccuracyResult compute_accuracy(double* as, bool* attack, int timeNum, int topN)
 
     int tp = 0, fp = 0, tn = 0, fn = 0;
 
-    // Count positives in the whole set for recall denominator
     int positives = 0, negatives = 0;
     for (int i = 0; i < timeNum; ++i) {
         if (attack[i]) positives++; else negatives++;
@@ -50,7 +48,6 @@ AccuracyResult compute_accuracy(double* as, bool* attack, int timeNum, int topN)
     double tpr       = recall;
     double fpr       = (fp + tn) ? (double)fp / (fp + tn) : 0.0;
 
-    // Optional: also print to stdout like your old version
     std::cout << "[TOP" << topN << "] precision: " << precision
               << ", recall: " << recall << std::endl;
 
